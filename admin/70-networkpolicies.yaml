@@ -1,0 +1,73 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: navosec-admin
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: navosec-admin
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+# Nur Traefik darf die Admin-App erreichen (admin.<domain>)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-traefik
+  namespace: navosec-admin
+spec:
+  podSelector:
+    matchLabels:
+      app: navosec-admin
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: traefik
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Admin-App: DNS, Control-Plane-DB, HTTPS (Google OAuth, Kubernetes-API, ACME)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns-db-https
+  namespace: navosec-admin
+spec:
+  podSelector:
+    matchLabels:
+      app: navosec-admin
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 10.0.1.200/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443

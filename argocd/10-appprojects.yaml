@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+spec:
+  sourceRepos:
+    - '*'
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: applications
+spec:
+  sourceRepos:
+    - '*'
+  destinations:
+    - namespace: navosec-admin
+      server: https://kubernetes.default.svc
+    - namespace: navosec-prod
+      server: https://kubernetes.default.svc
+    - namespace: 'tenant-*'
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'

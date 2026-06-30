@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: navosec-hard-quota
+  namespace: navosec-prod
+spec:
+  hard:
+    requests.cpu: "12"
+    requests.memory: 24Gi
+    limits.cpu: "24"
+    limits.memory: 48Gi
+    persistentvolumeclaims: "20"
+    pods: "120"

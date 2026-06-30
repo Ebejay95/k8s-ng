@@ -1,0 +1,12 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: navosec-admin
+  namespace: navosec-admin
+spec:
+  tls:
+    - hosts:
+        - admin.test.navosec.de
+      secretName: navosec-admin-test-tls
+  rules:
+    - host: admin.test.navosec.de

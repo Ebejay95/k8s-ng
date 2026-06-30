@@ -1,0 +1,12 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: navosec-admin
+  namespace: navosec-admin
+spec:
+  tls:
+    - hosts:
+        - admin.staging.navosec.de
+      secretName: navosec-admin-staging-tls
+  rules:
+    - host: admin.staging.navosec.de

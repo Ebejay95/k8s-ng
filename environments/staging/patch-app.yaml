@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: navosec-admin
+  namespace: navosec-admin
+spec:
+  replicas: 2
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: navosec-admin
+  namespace: navosec-admin
+spec:
+  minReplicas: 2
+  maxReplicas: 6

@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tenant-delete-template
+  labels:
+    app: tenant-management
+    operation: delete
+spec:
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: tenant-management
+        operation: delete
+    spec:
+      serviceAccountName: tenant-manager
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: tenant-delete
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "This is a template job. Duplicate and replace TENANT_ID."
+              echo "1) backup tenant"
+              echo "2) remove ingress/hpa/secret"
+              echo "3) drop tenant DB"
+              exit 0
+          env:
+            - name: TENANT_ID
+              value: TENANT_ID
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

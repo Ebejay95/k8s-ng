@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: navosec-admin-config
+  namespace: navosec-admin
+data:
+  ASPNETCORE_ENVIRONMENT: Production

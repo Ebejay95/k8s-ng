@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: navosec-default-limits
+  namespace: navosec-prod
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: 1
+        memory: 1Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: navosec-hard-quota
+  namespace: navosec-prod
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    persistentvolumeclaims: "20"
+    pods: "100"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: observability-default-limits
+  namespace: observability
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: 500m
+        memory: 1Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: observability-hard-quota
+  namespace: observability
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    pods: "30"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ai-default-limits
+  namespace: ai
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 500m
+        memory: 1Gi
+      default:
+        cpu: "4"
+        memory: 8Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ai-hard-quota
+  namespace: ai
+spec:
+  hard:
+    requests.cpu: "12"
+    requests.memory: 48Gi
+    limits.cpu: "24"
+    limits.memory: 96Gi
+    requests.nvidia.com/gpu: "2"
+    limits.nvidia.com/gpu: "2"
+    persistentvolumeclaims: "5"
+    pods: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: external-secrets-default-limits
+  namespace: external-secrets
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      default:
+        cpu: 300m
+        memory: 256Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: external-secrets-hard-quota
+  namespace: external-secrets
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 2Gi
+    limits.cpu: "4"
+    limits.memory: 4Gi
+    pods: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: argocd-default-limits
+  namespace: argocd
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: 500m
+        memory: 512Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: argocd-hard-quota
+  namespace: argocd
+spec:
+  hard:
+    requests.cpu: "6"
+    requests.memory: 8Gi
+    limits.cpu: "12"
+    limits.memory: 16Gi
+    pods: "40"

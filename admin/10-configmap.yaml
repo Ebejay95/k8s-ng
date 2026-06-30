@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: navosec-admin-config
+  namespace: navosec-admin
+  labels:
+    app: navosec-admin
+data:
+  ASPNETCORE_URLS: http://+:8080
+  ASPNETCORE_ENVIRONMENT: Production
+  # Admin-Modus: verwaltet die zentrale Tenant-Registry,
+  # serviciert KEINE Kundendaten.
+  Tenant__Mode: Admin
+  Tenant__IsAdmin: "true"
+  Health__EnableDetailed: "true"

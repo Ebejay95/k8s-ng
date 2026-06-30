@@ -1,0 +1,13 @@
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: cluster-daily
+  namespace: velero
+spec:
+  schedule: "0 1 * * *"
+  template:
+    ttl: 720h0m0s
+    includedNamespaces:
+      - navosec-prod
+      - observability
+      - argocd

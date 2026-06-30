@@ -1,0 +1,50 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: navosec-prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-egress
+  namespace: navosec-prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+# navosec-prod ist die Management-/Control-Plane-Betriebsebene:
+# Hier laufen die Tenant-Manager-Jobs (Provisioning/Deletion/Backup).
+# Sie brauchen DNS + Zugriff auf die Kubernetes-API und Git/Registry (443).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-tenant-manager-egress
+  namespace: navosec-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: tenant-management
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5432

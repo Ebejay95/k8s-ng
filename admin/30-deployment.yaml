@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: navosec-admin
+  namespace: navosec-admin
+  labels:
+    app: navosec-admin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: navosec-admin
+  namespace: navosec-admin
+  labels:
+    app: navosec-admin
+    navosec.io/tier: admin
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: navosec-admin
+  template:
+    metadata:
+      labels:
+        app: navosec-admin
+        navosec.io/tier: admin
+    spec:
+      serviceAccountName: navosec-admin
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 2000
+      containers:
+        - name: app
+          image: ghcr.io/yourorg/navosec-web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: navosec-admin-config
+            - secretRef:
+                name: navosec-admin-secret
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

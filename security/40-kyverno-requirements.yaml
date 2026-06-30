@@ -1,0 +1,107 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resources-and-nonroot
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: require-requests-and-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Jeder Container braucht requests und limits."
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests:
+                    memory: "?*"
+                    cpu: "?*"
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"
+    - name: require-run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Container muessen als non-root laufen."
+        pattern:
+          spec:
+            securityContext:
+              runAsNonRoot: true
+---
+# Erzwingt: kein Pod nutzt den default-ServiceAccount und kein Pod mountet
+# ungewollt ein API-Token. Ausnahme: explizit erlaubte SAs (API-Bedarf).
+#
+# Scope bewusst auf die selbst betriebenen Namespaces begrenzt, damit
+# Plattform-Komponenten (argocd, external-secrets-Operator, kube-system,
+# Ingress, cert-manager, observability-Agents) nicht versehentlich blockiert
+# werden.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-serviceaccount-tokens
+  annotations:
+    policies.kyverno.io/title: Restrict ServiceAccount Tokens
+    policies.kyverno.io/category: Security, RBAC
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Verbietet die Nutzung des default-ServiceAccounts und erzwingt
+      automountServiceAccountToken=false fuer alle Pods ohne API-Bedarf.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: disallow-default-serviceaccount
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - navosec-admin
+                - navosec-prod
+                - ai
+                - "tenant-*"
+      validate:
+        message: >-
+          Pods duerfen den 'default' ServiceAccount nicht verwenden.
+          Bitte einen dedizierten ServiceAccount setzen.
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.serviceAccountName || 'default' }}"
+                operator: Equals
+                value: default
+    - name: require-automount-token-disabled
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - navosec-admin
+                - navosec-prod
+                - ai
+                - "tenant-*"
+      validate:
+        message: >-
+          Pods muessen automountServiceAccountToken=false setzen.
+          Ausnahmen mit API-Bedarf: tenant-manager.
+        deny:
+          conditions:
+            all:
+              - key: "{{ request.object.spec.serviceAccountName || 'default' }}"
+                operator: AnyNotIn
+                value:
+                  - tenant-manager
+              - key: "{{ request.object.spec.automountServiceAccountToken }}"
+                operator: NotEquals
+                value: false

@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tenant-nightly-backup
+  labels:
+    app: tenant-management
+    operation: backup
+spec:
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: tenant-management
+            operation: backup
+        spec:
+          serviceAccountName: tenant-manager
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backup
+              image: postgres:16
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Run tenant backup loop here (pg_dump per tenant)"
+                  exit 0
+              env:
+                - name: PGHOST
+                  value: 10.0.1.200
+                - name: PGPORT
+                  value: "5432"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi

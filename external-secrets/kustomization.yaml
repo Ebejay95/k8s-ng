@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: external-secrets
+
+resources:
+  - 00-namespace.yaml
+  - 10-bitwarden-cli-credentials-template.yaml
+  - 11-bitwarden-cli-deployment.yaml
+  - 12-bitwarden-cli-service.yaml
+  - 13-bitwarden-cli-networkpolicy.yaml
+  - 20-clustersecretstore-bitwarden-login.yaml
+  - 21-clustersecretstore-bitwarden-fields.yaml

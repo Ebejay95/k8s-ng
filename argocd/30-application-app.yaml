@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: navosec-admin
+spec:
+  project: applications
+  source:
+    repoURL: https://github.com/yourorg/k8s-ng.git
+    targetRevision: main
+    path: admin
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: navosec-admin
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

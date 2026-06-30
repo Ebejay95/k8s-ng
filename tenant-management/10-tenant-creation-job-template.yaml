@@ -1,0 +1,537 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tenant-create-template
+  labels:
+    app: tenant-management
+    operation: create
+spec:
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: tenant-management
+        operation: create
+    spec:
+      serviceAccountName: tenant-manager
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: tenant-create
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+
+              if [ -z "${TENANT_ID}" ] || [ "${TENANT_ID}" = "TENANT_ID" ]; then
+                echo "TENANT_ID ist nicht gesetzt."
+                exit 1
+              fi
+
+              NS="tenant-${TENANT_ID}"
+              PLAN="${PLAN:-pro}"
+              NODE_NAME="${NODE_NAME:-}"
+              DOMAIN="${DOMAIN:-meinedomain.de}"
+              APP_IMAGE="${APP_IMAGE:-ghcr.io/yourorg/navosec-web:latest}"
+
+              case "$PLAN" in
+                free)
+                  APP_REQ_CPU="250m"; APP_REQ_MEM="512Mi"; APP_LIM_CPU="500m"; APP_LIM_MEM="1Gi"
+                  QUOTA_REQ_CPU="2"; QUOTA_REQ_MEM="4Gi"; QUOTA_LIM_CPU="4"; QUOTA_LIM_MEM="8Gi"; QUOTA_PODS="30"
+                  APP_REPLICAS="1"
+                  ;;
+                enterprise)
+                  APP_REQ_CPU="1000m"; APP_REQ_MEM="2Gi"; APP_LIM_CPU="2000m"; APP_LIM_MEM="4Gi"
+                  QUOTA_REQ_CPU="12"; QUOTA_REQ_MEM="24Gi"; QUOTA_LIM_CPU="24"; QUOTA_LIM_MEM="48Gi"; QUOTA_PODS="120"
+                  APP_REPLICAS="3"
+                  ;;
+                *)
+                  APP_REQ_CPU="500m"; APP_REQ_MEM="1Gi"; APP_LIM_CPU="1000m"; APP_LIM_MEM="2Gi"
+                  QUOTA_REQ_CPU="6"; QUOTA_REQ_MEM="12Gi"; QUOTA_LIM_CPU="12"; QUOTA_LIM_MEM="24Gi"; QUOTA_PODS="60"
+                  APP_REPLICAS="2"
+                  ;;
+              esac
+
+              echo "Provisioning namespace ${NS} (plan=${PLAN}, node=${NODE_NAME:-<none>})"
+
+              # Node-Ausrollung: dedizierten Node fuer den Tenant pinnen
+              # (Label + Taint). Ohne Node bleiben die Tenant-Pods Pending.
+              if [ -n "${NODE_NAME}" ]; then
+                echo "Pinning node ${NODE_NAME} to tenant ${TENANT_ID}"
+                CURRENT=$(kubectl get node "${NODE_NAME}" -o jsonpath="{.metadata.labels.tenant\.navosec\.io/dedicated}" 2>/dev/null || true)
+                if [ -n "${CURRENT}" ] && [ "${CURRENT}" != "${TENANT_ID}" ]; then
+                  echo "Node ${NODE_NAME} gehoert bereits Tenant ${CURRENT}."; exit 1
+                fi
+                kubectl label node "${NODE_NAME}" "tenant.navosec.io/dedicated=${TENANT_ID}" --overwrite
+                kubectl taint node "${NODE_NAME}" "tenant.navosec.io/dedicated=${TENANT_ID}:NoSchedule" --overwrite
+              else
+                echo "WARN: kein NODE_NAME gesetzt – Node muss separat zugewiesen werden"
+              fi
+
+              kubectl apply -f - <<EOF
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: ${NS}
+                labels:
+                  name: ${NS}
+                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec/plan: ${PLAN}
+                  navosec.io/tier: tenant
+                  pod-security.kubernetes.io/enforce: restricted
+                  pod-security.kubernetes.io/enforce-version: latest
+                  pod-security.kubernetes.io/audit: restricted
+                  pod-security.kubernetes.io/warn: restricted
+              ---
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: default
+                namespace: ${NS}
+              automountServiceAccountToken: false
+              ---
+              apiVersion: v1
+              kind: LimitRange
+              metadata:
+                name: tenant-default-limits
+                namespace: ${NS}
+              spec:
+                limits:
+                  - type: Container
+                    defaultRequest:
+                      cpu: ${APP_REQ_CPU}
+                      memory: ${APP_REQ_MEM}
+                    default:
+                      cpu: ${APP_LIM_CPU}
+                      memory: ${APP_LIM_MEM}
+              ---
+              apiVersion: v1
+              kind: ResourceQuota
+              metadata:
+                name: tenant-hard-quota
+                namespace: ${NS}
+              spec:
+                hard:
+                  requests.cpu: "${QUOTA_REQ_CPU}"
+                  requests.memory: ${QUOTA_REQ_MEM}
+                  limits.cpu: "${QUOTA_LIM_CPU}"
+                  limits.memory: ${QUOTA_LIM_MEM}
+                  pods: "${QUOTA_PODS}"
+                  persistentvolumeclaims: "20"
+              ---
+              apiVersion: networking.k8s.io/v1
+              kind: NetworkPolicy
+              metadata:
+                name: default-deny-ingress
+                namespace: ${NS}
+              spec:
+                podSelector: {}
+                policyTypes:
+                  - Ingress
+              ---
+              apiVersion: networking.k8s.io/v1
+              kind: NetworkPolicy
+              metadata:
+                name: default-deny-egress
+                namespace: ${NS}
+              spec:
+                podSelector: {}
+                policyTypes:
+                  - Egress
+              ---
+              apiVersion: networking.k8s.io/v1
+              kind: NetworkPolicy
+              metadata:
+                name: allow-ingress-from-traefik
+                namespace: ${NS}
+              spec:
+                podSelector:
+                  matchLabels:
+                    app: navosec-app
+                policyTypes:
+                  - Ingress
+                ingress:
+                  - from:
+                      - namespaceSelector:
+                          matchLabels:
+                            name: traefik
+                    ports:
+                      - protocol: TCP
+                        port: 8080
+              ---
+              apiVersion: networking.k8s.io/v1
+              kind: NetworkPolicy
+              metadata:
+                name: allow-egress-dns-db-https
+                namespace: ${NS}
+              spec:
+                podSelector:
+                  matchLabels:
+                    app: navosec-app
+                policyTypes:
+                  - Egress
+                egress:
+                  - to:
+                      - namespaceSelector:
+                          matchLabels:
+                            kubernetes.io/metadata.name: kube-system
+                    ports:
+                      - protocol: UDP
+                        port: 53
+                  - to:
+                      - ipBlock:
+                          cidr: 10.0.1.200/32
+                    ports:
+                      - protocol: TCP
+                        port: 5432
+                  - to:
+                      - podSelector:
+                          matchLabels:
+                            app: ollama
+                    ports:
+                      - protocol: TCP
+                        port: 11434
+                  - to:
+                      - ipBlock:
+                          cidr: 0.0.0.0/0
+                    ports:
+                      - protocol: TCP
+                        port: 443
+              EOF
+
+              echo "Deploying dedicated tenant app (${TENANT_ID}.${DOMAIN})"
+              kubectl apply -f - <<EOF
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: navosec-app-config
+                namespace: ${NS}
+                labels:
+                  app: navosec-app
+                  tenant.navosec/id: ${TENANT_ID}
+              data:
+                ASPNETCORE_URLS: http://+:8080
+                ASPNETCORE_ENVIRONMENT: Production
+                Tenant__Mode: DedicatedTenant
+                Tenant__Id: ${TENANT_ID}
+                Health__EnableDetailed: "true"
+              ---
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: navosec-app
+                namespace: ${NS}
+                labels:
+                  app: navosec-app
+                  tenant.navosec/id: ${TENANT_ID}
+              ---
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: navosec-app
+                namespace: ${NS}
+                labels:
+                  app: navosec-app
+                  tenant.navosec/id: ${TENANT_ID}
+              spec:
+                replicas: ${APP_REPLICAS}
+                selector:
+                  matchLabels:
+                    app: navosec-app
+                template:
+                  metadata:
+                    labels:
+                      app: navosec-app
+                      tenant.navosec/id: ${TENANT_ID}
+                  spec:
+                    serviceAccountName: navosec-app
+                    automountServiceAccountToken: false
+                    nodeSelector:
+                      tenant.navosec.io/dedicated: ${TENANT_ID}
+                    tolerations:
+                      - key: tenant.navosec.io/dedicated
+                        operator: Equal
+                        value: ${TENANT_ID}
+                        effect: NoSchedule
+                    securityContext:
+                      runAsNonRoot: true
+                      fsGroup: 2000
+                    containers:
+                      - name: app
+                        image: ${APP_IMAGE}
+                        imagePullPolicy: IfNotPresent
+                        ports:
+                          - name: http
+                            containerPort: 8080
+                        envFrom:
+                          - configMapRef:
+                              name: navosec-app-config
+                          - secretRef:
+                              name: tenant-db-secret
+                        resources:
+                          requests:
+                            cpu: ${APP_REQ_CPU}
+                            memory: ${APP_REQ_MEM}
+                          limits:
+                            cpu: ${APP_LIM_CPU}
+                            memory: ${APP_LIM_MEM}
+                        securityContext:
+                          allowPrivilegeEscalation: false
+                          readOnlyRootFilesystem: true
+                          capabilities:
+                            drop: ["ALL"]
+                        startupProbe:
+                          httpGet:
+                            path: /health/startup
+                            port: http
+                          periodSeconds: 10
+                          failureThreshold: 30
+                        livenessProbe:
+                          httpGet:
+                            path: /health/live
+                            port: http
+                          initialDelaySeconds: 30
+                          periodSeconds: 10
+                          failureThreshold: 3
+                        readinessProbe:
+                          httpGet:
+                            path: /health/ready
+                            port: http
+                          initialDelaySeconds: 10
+                          periodSeconds: 5
+                          failureThreshold: 3
+                        volumeMounts:
+                          - name: tmp
+                            mountPath: /tmp
+                    volumes:
+                      - name: tmp
+                        emptyDir: {}
+              ---
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: navosec-app
+                namespace: ${NS}
+                labels:
+                  app: navosec-app
+                  tenant.navosec/id: ${TENANT_ID}
+              spec:
+                selector:
+                  app: navosec-app
+                ports:
+                  - name: http
+                    port: 80
+                    targetPort: http
+              ---
+              apiVersion: networking.k8s.io/v1
+              kind: Ingress
+              metadata:
+                name: navosec-app
+                namespace: ${NS}
+                annotations:
+                  cert-manager.io/cluster-issuer: letsencrypt-prod
+                labels:
+                  app: navosec-app
+                  tenant.navosec/id: ${TENANT_ID}
+              spec:
+                ingressClassName: traefik
+                tls:
+                  - hosts:
+                      - ${TENANT_ID}.${DOMAIN}
+                    secretName: tenant-${TENANT_ID}-tls
+                rules:
+                  - host: ${TENANT_ID}.${DOMAIN}
+                    http:
+                      paths:
+                        - path: /
+                          pathType: Prefix
+                          backend:
+                            service:
+                              name: navosec-app
+                              port:
+                                number: 80
+              EOF
+
+              echo "Deploying mandatory dedicated ollama for tenant ${TENANT_ID}"
+              kubectl apply -f - <<EOF
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: ollama
+                namespace: ${NS}
+                labels:
+                  app: ollama
+                  tenant.navosec/id: ${TENANT_ID}
+              automountServiceAccountToken: false
+              ---
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+              metadata:
+                name: ollama-models
+                namespace: ${NS}
+                labels:
+                  app: ollama
+                  tenant.navosec/id: ${TENANT_ID}
+              spec:
+                accessModes: ["ReadWriteOnce"]
+                resources:
+                  requests:
+                    storage: ${OLLAMA_MODEL_STORAGE:-50Gi}
+              ---
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: ollama
+                namespace: ${NS}
+                labels:
+                  app: ollama
+                  tenant.navosec/id: ${TENANT_ID}
+              spec:
+                replicas: 1
+                selector:
+                  matchLabels:
+                    app: ollama
+                template:
+                  metadata:
+                    labels:
+                      app: ollama
+                      tenant.navosec/id: ${TENANT_ID}
+                  spec:
+                    serviceAccountName: ollama
+                    automountServiceAccountToken: false
+                    nodeSelector:
+                      tenant.navosec.io/dedicated: ${TENANT_ID}
+                    tolerations:
+                      - key: tenant.navosec.io/dedicated
+                        operator: Equal
+                        value: ${TENANT_ID}
+                        effect: NoSchedule
+                      - key: gpu
+                        operator: Equal
+                        value: "true"
+                        effect: NoSchedule
+                    securityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                      runAsGroup: 1000
+                      fsGroup: 1000
+                      seccompProfile:
+                        type: RuntimeDefault
+                    containers:
+                      - name: ollama
+                        image: ollama/ollama:0.9.6
+                        ports:
+                          - name: http
+                            containerPort: 11434
+                        env:
+                          - name: OLLAMA_HOST
+                            value: 0.0.0.0:11434
+                        resources:
+                          requests:
+                            cpu: "2"
+                            memory: "16Gi"
+                            nvidia.com/gpu: "1"
+                          limits:
+                            cpu: "6"
+                            memory: "32Gi"
+                            nvidia.com/gpu: "1"
+                        securityContext:
+                          allowPrivilegeEscalation: false
+                          capabilities:
+                            drop: ["ALL"]
+                        volumeMounts:
+                          - name: models
+                            mountPath: /root/.ollama
+                    volumes:
+                      - name: models
+                        persistentVolumeClaim:
+                          claimName: ollama-models
+              ---
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: ollama
+                namespace: ${NS}
+                labels:
+                  app: ollama
+              spec:
+                selector:
+                  app: ollama
+                ports:
+                  - name: http
+                    port: 11434
+                    targetPort: http
+                type: ClusterIP
+              ---
+              apiVersion: networking.k8s.io/v1
+              kind: NetworkPolicy
+              metadata:
+                name: allow-navosec-app-to-ollama
+                namespace: ${NS}
+              spec:
+                podSelector:
+                  matchLabels:
+                    app: ollama
+                policyTypes:
+                  - Ingress
+                  - Egress
+                ingress:
+                  - from:
+                      - podSelector:
+                          matchLabels:
+                            app: navosec-app
+                    ports:
+                      - protocol: TCP
+                        port: 11434
+                egress:
+                  - to:
+                      - namespaceSelector:
+                          matchLabels:
+                            kubernetes.io/metadata.name: kube-system
+                    ports:
+                      - protocol: UDP
+                        port: 53
+                  - to:
+                      - ipBlock:
+                          cidr: 0.0.0.0/0
+                    ports:
+                      - protocol: TCP
+                        port: 443
+              EOF
+
+              echo "Tenant namespace ${NS} wurde provisioniert."
+          env:
+            - name: TENANT_ID
+              value: TENANT_ID
+            - name: PLAN
+              value: pro
+            - name: NODE_NAME
+              value: ""
+            - name: DOMAIN
+              value: meinedomain.de
+            - name: APP_IMAGE
+              value: ghcr.io/yourorg/navosec-web:latest
+            - name: OLLAMA_MODEL_STORAGE
+              value: 50Gi
+            - name: TENANT_DB_HOST
+              value: 10.0.1.200
+            - name: TENANT_DB_PORT
+              value: "5432"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

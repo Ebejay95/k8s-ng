@@ -1,0 +1,62 @@
+# Default-ServiceAccount-Lockdown
+#
+# Sicherheitsbaseline: In KEINEM Namespace soll der automatisch erzeugte
+# `default`-ServiceAccount ein API-Token in Pods einhaengen. Damit kann ein
+# kompromittierter Pod, der (versehentlich) den default-SA nutzt, sich nicht
+# gegen die Kubernetes-API authentifizieren.
+#
+# Der default-SA erhaelt in diesem Repo ohnehin KEINE RoleBindings (also keine
+# Rechte). Das Deaktivieren des Token-Mounts entfernt zusaetzlich die
+# verbleibende Angriffsflaeche (Identitaet/Token im Pod).
+#
+# Echte Workloads nutzen dedizierte ServiceAccounts; alle uebrigen Pods setzen
+# zusaetzlich pod-seitig automountServiceAccountToken: false.
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: navosec-prod
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: navosec-admin
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: ai
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: external-secrets
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: observability
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: argocd
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: kyverno
+automountServiceAccountToken: false

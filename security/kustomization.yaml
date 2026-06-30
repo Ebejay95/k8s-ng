@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - 00-namespaces.yaml
+  - 20-default-sa-lockdown.yaml
+  - 30-networkpolicies.yaml
+  - 35-networkpolicies-isolation.yaml
+  - 40-kyverno-requirements.yaml
+  - 50-limits-and-quotas.yaml

@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: navosec-admin
+  namespace: navosec-admin
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - admin.meinedomain.de
+      secretName: navosec-admin-tls
+  rules:
+    - host: admin.meinedomain.de
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: navosec-admin
+                port:
+                  number: 80
