@@ -1,0 +1,29 @@
+name: validate-manifests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  kustomize-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl (mit kustomize)
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.0
+
+      - name: Render base + alle Overlays
+        run: |
+          set -e
+          for t in . environments/test environments/staging environments/prod; do
+            echo "::group::kustomize build $t"
+            kubectl kustomize "$t" > /dev/null
+            echo "OK $t"
+            echo "::endgroup::"
+          done

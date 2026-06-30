@@ -56,6 +56,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: app
           image: __APP_IMAGE__

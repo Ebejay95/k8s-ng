@@ -11,3 +11,10 @@ patchesStrategicMerge:
   - patch-externalsecret.yaml
   - patch-quota.yaml
   - patch-ollama.yaml
+
+# Test-Umgebung nutzt die Dummy-Admin-App statt des echten Images.
+# admin/30-deployment.yaml bleibt dadurch unveraendert.
+images:
+  - name: ghcr.io/yourorg/navosec-web
+    newName: ghcr.io/ebejay95/dummy-admin
+    newTag: latest
