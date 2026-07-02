@@ -1,0 +1,74 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: reference
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: reference
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+# Wer darf die Stammdaten-DB erreichen: die Admin-App (schreibt) und alle
+# Tenant-Apps (lesen). Read-only vs. read-write wird ueber DB-Rollen
+# (reference_owner / reference_reader) erzwungen, nicht ueber das Netz.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-clients
+  namespace: reference
+spec:
+  podSelector:
+    matchLabels:
+      app: reference-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Admin-App (RW)
+        - namespaceSelector:
+            matchLabels:
+              name: navosec-admin
+          podSelector:
+            matchLabels:
+              app: navosec-admin
+        # Alle Tenant-Apps (RO)
+        - namespaceSelector:
+            matchLabels:
+              navosec.io/tier: tenant
+          podSelector:
+            matchLabels:
+              app: navosec-app
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# Egress der DB: nur DNS (kein Ausgang nach aussen noetig).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: reference
+spec:
+  podSelector:
+    matchLabels:
+      app: reference-db
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53

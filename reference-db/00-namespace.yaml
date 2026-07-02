@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reference
+  labels:
+    # Von den NetworkPolicies der Clients (admin/tenant) referenziert.
+    name: reference
+    navosec.io/tier: reference
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

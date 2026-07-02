@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: reference-db
+  namespace: reference
+  labels:
+    app: reference-db
+spec:
+  # Headless: stabile DNS-Identitaet fuer das StatefulSet. Clients erreichen
+  # die DB unter reference-db.reference.svc.cluster.local:5432.
+  clusterIP: None
+  selector:
+    app: reference-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

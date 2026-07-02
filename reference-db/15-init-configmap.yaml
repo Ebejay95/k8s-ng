@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reference-db-init
+  namespace: reference
+  labels:
+    app: reference-db
+data:
+  # Laeuft EINMALIG beim ersten Start (leeres Datenverzeichnis) durch den
+  # offiziellen Postgres-Entrypoint. Legt die READ-ONLY-Rolle an, die die
+  # Tenants nutzen. Passwort kommt aus dem Secret (Env READER_PASSWORD).
+  01-reader-role.sh: |
+    #!/bin/bash
+    set -e
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+      DO \$\$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'reference_reader') THEN
+          CREATE ROLE reference_reader LOGIN PASSWORD '${READER_PASSWORD}';
+        END IF;
+      END
+      \$\$;
+      GRANT CONNECT ON DATABASE reference TO reference_reader;
+      GRANT USAGE ON SCHEMA public TO reference_reader;
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO reference_reader;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO reference_reader;
+    EOSQL

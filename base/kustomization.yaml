@@ -5,6 +5,7 @@ resources:
   - ../security
   - ../ingress
   - ../external-secrets
+  - ../reference-db
   - ../admin
   - ../ollama
   - ../tenant-management

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reference-db-config
+  namespace: reference
+  labels:
+    app: reference-db
+data:
+  # Stammdaten-DB. Der "owner" (RW) gehoert der Admin-App; Tenants lesen
+  # ueber die separate Rolle reference_reader (siehe Init-Skript).
+  POSTGRES_DB: reference
+  POSTGRES_USER: reference_owner
+  # Eigenes Unterverzeichnis, damit der Mount-Root dem non-root-User egal ist.
+  PGDATA: /var/lib/postgresql/data/pgdata

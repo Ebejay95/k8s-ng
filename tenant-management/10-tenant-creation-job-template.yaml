@@ -40,8 +40,6 @@ spec:
               NODE_NAME="${NODE_NAME:-}"
               DOMAIN="${DOMAIN:-meinedomain.de}"
               APP_IMAGE="${APP_IMAGE:-ghcr.io/yourorg/navosec-web:latest}"
-              # Stammdaten-/Referenz-DB (Tenant liest read-only). PLATZHALTER.
-              REFERENCE_DB_CIDR="${REFERENCE_DB_CIDR:-10.0.1.201/32}"
 
               case "$PLAN" in
                 free)
@@ -193,10 +191,15 @@ spec:
                     ports:
                       - protocol: TCP
                         port: 5432
-                  # Stammdaten-/Referenz-DB: nur lesend (read-only DB-Rolle).
+                  # Stammdaten-/Referenz-DB (In-Cluster): nur die Verbindung;
+                  # Nur-Lesen erzwingt die DB-Rolle reference_reader.
                   - to:
-                      - ipBlock:
-                          cidr: ${REFERENCE_DB_CIDR}
+                      - namespaceSelector:
+                          matchLabels:
+                            name: reference
+                        podSelector:
+                          matchLabels:
+                            app: reference-db
                     ports:
                       - protocol: TCP
                         port: 5432
@@ -595,10 +598,6 @@ spec:
               value: 10.0.1.200
             - name: TENANT_DB_PORT
               value: "5432"
-            - name: REFERENCE_DB_HOST
-              value: 10.0.1.201
-            - name: REFERENCE_DB_CIDR
-              value: 10.0.1.201/32
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
