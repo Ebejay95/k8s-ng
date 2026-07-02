@@ -1,0 +1,38 @@
+# Headlamp braucht Cluster-Zugriff, um alles zu visualisieren/verwalten.
+# cluster-admin gibt volle Sicht + Verwaltung (Admin-Werkzeug). Wer nur
+# lesen will, bindet stattdessen die eingebaute ClusterRole "view".
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: headlamp
+  namespace: headlamp
+  labels:
+    app: headlamp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: headlamp-admin
+  labels:
+    app: headlamp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: headlamp
+    namespace: headlamp
+---
+# Langlebiges Login-Token fuer den Headlamp-ServiceAccount (Bearer-Token beim
+# Login in der UI eingeben). K8s befuellt .data.token automatisch.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: headlamp-token
+  namespace: headlamp
+  labels:
+    app: headlamp
+  annotations:
+    kubernetes.io/service-account.name: headlamp
+type: kubernetes.io/service-account-token

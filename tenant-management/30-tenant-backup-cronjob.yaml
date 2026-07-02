@@ -33,11 +33,11 @@ spec:
                 - /bin/sh
                 - -c
                 - |
-                  echo "Run tenant backup loop here (pg_dump per tenant)"
+                  # Logischer Dump je Tenant-DB (tenant-db.<ns>:5432). Die
+                  # PV-Ebene sichert zusaetzlich Velero (Schedule tenants-daily).
+                  echo "Run tenant backup loop here (pg_dump per tenant-db)"
                   exit 0
               env:
-                - name: PGHOST
-                  value: 10.0.1.200
                 - name: PGPORT
                   value: "5432"
               securityContext:

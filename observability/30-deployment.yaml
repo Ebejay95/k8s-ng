@@ -26,6 +26,9 @@ spec:
           args:
             - --config.file=/etc/prometheus/prometheus.yml
             - --enable-feature=agent
+          ports:
+            - name: web
+              containerPort: 9090
           volumeMounts:
             - name: config
               mountPath: /etc/prometheus
@@ -34,6 +37,25 @@ spec:
             capabilities:
               drop:
                 - ALL
+          # A11: readiness/liveness Checks fuer den Agenten
+          startupProbe:
+            httpGet:
+              path: /-/ready
+              port: web
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: web
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: web
+            initialDelaySeconds: 15
+            periodSeconds: 20
           resources:
             requests:
               cpu: 100m

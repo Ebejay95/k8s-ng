@@ -1,0 +1,64 @@
+# APP.4.4.A5 — Regelmaessige etcd-Snapshots.
+# Laeuft auf den Control-Plane-Nodes (hostNetwork + Zugriff auf die etcd-PKI)
+# und speichert Snapshots lokal; ein separater Prozess/Backup-Agent sollte das
+# Snapshot-Verzeichnis anschliessend offsite sichern (siehe backup/).
+#
+# ACHTUNG: benoetigt Host-Zugriff -> bewusst im Namespace kube-system, NICHT in
+# den 'restricted'-Namespaces.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etcd-snapshot
+  namespace: kube-system
+  labels:
+    app: etcd-backup
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          hostNetwork: true
+          # Nur auf Control-Plane-Nodes ausfuehren.
+          nodeSelector:
+            node-role.kubernetes.io/control-plane: ""
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+          containers:
+            - name: etcdctl
+              image: registry.k8s.io/etcd:3.5.15-0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  TS=$(date +%Y%m%d-%H%M%S)
+                  ETCDCTL_API=3 etcdctl \
+                    --endpoints=https://127.0.0.1:2379 \
+                    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+                    --cert=/etc/kubernetes/pki/etcd/server.crt \
+                    --key=/etc/kubernetes/pki/etcd/server.key \
+                    snapshot save /snapshots/etcd-${TS}.db
+                  echo "etcd Snapshot erstellt: /snapshots/etcd-${TS}.db"
+              volumeMounts:
+                - name: etcd-certs
+                  mountPath: /etc/kubernetes/pki/etcd
+                  readOnly: true
+                - name: snapshots
+                  mountPath: /snapshots
+          volumes:
+            - name: etcd-certs
+              hostPath:
+                path: /etc/kubernetes/pki/etcd
+                type: Directory
+            - name: snapshots
+              hostPath:
+                path: /var/backups/etcd
+                type: DirectoryOrCreate

@@ -1,0 +1,40 @@
+# APP.4.4.A3 / A12 — API-Server Audit-Policy.
+# Protokolliert jede Aktion an der Control Plane (Authentifizierung/Autorisierung
+# ist Voraussetzung; anonyme Admin-Aktionen sind zu unterbinden:
+# kube-apiserver mit --anonymous-auth=false starten).
+#
+# Ablage z.B. /etc/kubernetes/audit-policy.yaml, kube-apiserver mit:
+#   --audit-policy-file=/etc/kubernetes/audit-policy.yaml
+#   --audit-log-path=/var/log/kubernetes/audit.log
+#   --audit-log-maxage=30 --audit-log-maxbackup=10 --audit-log-maxsize=100
+apiVersion: audit.k8s.io/v1
+kind: Policy
+# Health-/Discovery-Endpunkte nicht protokollieren (Rauschen vermeiden).
+omitStages:
+  - RequestReceived
+rules:
+  # Lese-Zugriffe auf nicht sensible Ressourcen nicht mitschreiben.
+  - level: None
+    verbs: ["get", "list", "watch"]
+    resources:
+      - group: ""
+        resources: ["events", "nodes/status", "pods/status"]
+
+  # Sicherheitsrelevant: RBAC-Aenderungen vollstaendig protokollieren.
+  - level: RequestResponse
+    resources:
+      - group: "rbac.authorization.k8s.io"
+        resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+
+  # Zugriffe auf Secrets/ConfigMaps: nur Metadaten (keine Inhalte im Log).
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps"]
+
+  # Aendernde Aktionen generell protokollieren.
+  - level: Metadata
+    verbs: ["create", "update", "patch", "delete", "deletecollection"]
+
+  # Fallback fuer alles Uebrige.
+  - level: Metadata

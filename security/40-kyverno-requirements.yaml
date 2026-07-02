@@ -3,7 +3,10 @@ kind: ClusterPolicy
 metadata:
   name: require-resources-and-nonroot
 spec:
-  validationFailureAction: Audit
+  # A13: Durchsetzung (Enforce) der Regeln im Cluster. Bewusst auf die
+  # selbst betriebenen Namespaces begrenzt, damit System-/Plattform-Pods
+  # (kube-system, cert-manager, ingress) nicht blockiert werden.
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: require-requests-and-limits
@@ -12,6 +15,13 @@ spec:
           - resources:
               kinds:
                 - Pod
+              namespaces:
+                - navosec-admin
+                - navosec-prod
+                - ai
+                - observability
+                - external-secrets
+                - "tenant-*"
       validate:
         message: "Jeder Container braucht requests und limits."
         pattern:
@@ -30,12 +40,60 @@ spec:
           - resources:
               kinds:
                 - Pod
+              namespaces:
+                - navosec-admin
+                - navosec-prod
+                - ai
+                - observability
+                - external-secrets
+                - "tenant-*"
       validate:
         message: "Container muessen als non-root laufen."
         pattern:
           spec:
             securityContext:
               runAsNonRoot: true
+---
+# A11: Erzwingt, dass langlaufende Workloads readiness- und liveness-Checks
+# definieren. Audit-Modus, damit Bestands-Workloads sichtbar, aber nicht
+# hart blockiert werden.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-health-probes
+  annotations:
+    policies.kyverno.io/title: Require Readiness and Liveness Probes
+    policies.kyverno.io/category: Reliability
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: require-liveness-readiness
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+              namespaces:
+                - navosec-admin
+                - navosec-prod
+                - ai
+                - observability
+                - external-secrets
+                - "tenant-*"
+      validate:
+        message: "Jeder Container braucht livenessProbe und readinessProbe."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - livenessProbe:
+                      "?*": "?*"
+                    readinessProbe:
+                      "?*": "?*"
 ---
 # Erzwingt: kein Pod nutzt den default-ServiceAccount und kein Pod mountet
 # ungewollt ein API-Token. Ausnahme: explizit erlaubte SAs (API-Bedarf).

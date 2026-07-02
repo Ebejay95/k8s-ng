@@ -75,6 +75,16 @@ spec:
                 echo "WARN: kein NODE_NAME gesetzt – Node muss separat zugewiesen werden"
               fi
 
+              # Per-Tenant DB-Zugangsdaten: einmalig generiert (max. dynamisch,
+              # kein zentrales Vault-Item pro Tenant noetig). Re-Run behaelt
+              # ein bereits vorhandenes Passwort bei (idempotent).
+              if kubectl get secret tenant-db-credentials -n "${NS}" >/dev/null 2>&1; then
+                TENANT_DB_PASSWORD=$(kubectl get secret tenant-db-credentials -n "${NS}" -o jsonpath='{.data.postgres-password}' | base64 -d)
+              else
+                TENANT_DB_PASSWORD=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
+              fi
+              REFERENCE_READER_PASSWORD="${REFERENCE_READER_PASSWORD:-}"
+
               kubectl apply -f - <<EOF
               apiVersion: v1
               kind: Namespace
@@ -185,9 +195,11 @@ spec:
                     ports:
                       - protocol: UDP
                         port: 53
+                  # Tenant-eigene DB (In-Cluster StatefulSet, selber Namespace).
                   - to:
-                      - ipBlock:
-                          cidr: 10.0.1.200/32
+                      - podSelector:
+                          matchLabels:
+                            app: tenant-db
                     ports:
                       - protocol: TCP
                         port: 5432
@@ -216,6 +228,180 @@ spec:
                     ports:
                       - protocol: TCP
                         port: 443
+              ---
+              apiVersion: networking.k8s.io/v1
+              kind: NetworkPolicy
+              metadata:
+                name: tenant-db-allow-ingress-from-app
+                namespace: ${NS}
+              spec:
+                podSelector:
+                  matchLabels:
+                    app: tenant-db
+                policyTypes:
+                  - Ingress
+                ingress:
+                  - from:
+                      - podSelector:
+                          matchLabels:
+                            app: navosec-app
+                    ports:
+                      - protocol: TCP
+                        port: 5432
+              ---
+              apiVersion: networking.k8s.io/v1
+              kind: NetworkPolicy
+              metadata:
+                name: tenant-db-allow-egress-dns
+                namespace: ${NS}
+              spec:
+                podSelector:
+                  matchLabels:
+                    app: tenant-db
+                policyTypes:
+                  - Egress
+                egress:
+                  - to:
+                      - namespaceSelector:
+                          matchLabels:
+                            kubernetes.io/metadata.name: kube-system
+                    ports:
+                      - protocol: UDP
+                        port: 53
+              EOF
+
+              echo "Provisioning in-cluster tenant database (tenant-db.${NS})"
+              # DB-Owner-Passwort als Secret (idempotent).
+              kubectl create secret generic tenant-db-credentials \
+                --namespace "${NS}" \
+                --from-literal=postgres-password="${TENANT_DB_PASSWORD}" \
+                --dry-run=client -o yaml | kubectl apply -f -
+              # Verbindungs-Secret fuer die App: eigene Tenant-DB (RW) +
+              # Referenz-/Stammdaten-DB (RO ueber reference_reader).
+              kubectl create secret generic tenant-db-secret \
+                --namespace "${NS}" \
+                --from-literal=ConnectionStrings__DefaultConnection="Host=tenant-db;Port=5432;Database=navosec_tenant;Username=navosec_tenant;Password=${TENANT_DB_PASSWORD}" \
+                --from-literal=ConnectionStrings__Reference="Host=reference-db.reference.svc.cluster.local;Port=5432;Database=reference;Username=reference_reader;Password=${REFERENCE_READER_PASSWORD}" \
+                --dry-run=client -o yaml | kubectl apply -f -
+
+              kubectl apply -f - <<EOF
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: tenant-db-config
+                namespace: ${NS}
+                labels:
+                  app: tenant-db
+                  tenant.navosec/id: ${TENANT_ID}
+              data:
+                POSTGRES_DB: navosec_tenant
+                POSTGRES_USER: navosec_tenant
+                PGDATA: /var/lib/postgresql/data/pgdata
+              ---
+              apiVersion: apps/v1
+              kind: StatefulSet
+              metadata:
+                name: tenant-db
+                namespace: ${NS}
+                labels:
+                  app: tenant-db
+                  tenant.navosec/id: ${TENANT_ID}
+              spec:
+                serviceName: tenant-db
+                replicas: 1
+                selector:
+                  matchLabels:
+                    app: tenant-db
+                template:
+                  metadata:
+                    labels:
+                      app: tenant-db
+                      tenant.navosec/id: ${TENANT_ID}
+                  spec:
+                    automountServiceAccountToken: false
+                    nodeSelector:
+                      tenant.navosec.io/dedicated: ${TENANT_ID}
+                    tolerations:
+                      - key: tenant.navosec.io/dedicated
+                        operator: Equal
+                        value: ${TENANT_ID}
+                        effect: NoSchedule
+                    securityContext:
+                      runAsNonRoot: true
+                      runAsUser: 999
+                      runAsGroup: 999
+                      fsGroup: 999
+                      seccompProfile:
+                        type: RuntimeDefault
+                    containers:
+                      - name: postgres
+                        image: postgres:16
+                        ports:
+                          - name: postgres
+                            containerPort: 5432
+                        envFrom:
+                          - configMapRef:
+                              name: tenant-db-config
+                        env:
+                          - name: POSTGRES_PASSWORD
+                            valueFrom:
+                              secretKeyRef:
+                                name: tenant-db-credentials
+                                key: postgres-password
+                        resources:
+                          requests:
+                            cpu: 100m
+                            memory: 256Mi
+                          limits:
+                            cpu: "1"
+                            memory: 1Gi
+                        securityContext:
+                          allowPrivilegeEscalation: false
+                          capabilities:
+                            drop: ["ALL"]
+                        startupProbe:
+                          exec:
+                            command: ["sh", "-c", "pg_isready -U \$POSTGRES_USER -d \$POSTGRES_DB"]
+                          periodSeconds: 5
+                          failureThreshold: 30
+                        livenessProbe:
+                          exec:
+                            command: ["sh", "-c", "pg_isready -U \$POSTGRES_USER -d \$POSTGRES_DB"]
+                          periodSeconds: 10
+                          failureThreshold: 3
+                        readinessProbe:
+                          exec:
+                            command: ["sh", "-c", "pg_isready -U \$POSTGRES_USER -d \$POSTGRES_DB"]
+                          periodSeconds: 5
+                          failureThreshold: 3
+                        volumeMounts:
+                          - name: data
+                            mountPath: /var/lib/postgresql/data
+                volumeClaimTemplates:
+                  - metadata:
+                      name: data
+                    spec:
+                      accessModes: ["ReadWriteOnce"]
+                      resources:
+                        requests:
+                          storage: ${TENANT_DB_STORAGE:-10Gi}
+              ---
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: tenant-db
+                namespace: ${NS}
+                labels:
+                  app: tenant-db
+                  tenant.navosec/id: ${TENANT_ID}
+              spec:
+                clusterIP: None
+                selector:
+                  app: tenant-db
+                ports:
+                  - name: postgres
+                    port: 5432
+                    targetPort: postgres
               EOF
 
               echo "Deploying dedicated tenant app (${TENANT_ID}.${DOMAIN})"
@@ -304,8 +490,8 @@ spec:
                           - /bin/sh
                           - -c
                           - |
-                            echo "Warte auf Datenbank 10.0.1.200:5432 ..."
-                            until nc -z -w 2 10.0.1.200 5432; do
+                            echo "Warte auf Datenbank tenant-db:5432 ..."
+                            until nc -z -w 2 tenant-db 5432; do
                               echo "DB nicht erreichbar - retry in 2s"; sleep 2;
                             done
                             echo "DB erreichbar - Initialisierung erfolgreich"
@@ -595,9 +781,15 @@ spec:
             - name: OLLAMA_MODEL_STORAGE
               value: 50Gi
             - name: TENANT_DB_HOST
-              value: 10.0.1.200
+              value: tenant-db
             - name: TENANT_DB_PORT
               value: "5432"
+            - name: TENANT_DB_STORAGE
+              value: 10Gi
+            # Reader-Passwort der Referenz-DB (reference_reader). Im echten
+            # Betrieb aus einem Secret injizieren (valueFrom.secretKeyRef).
+            - name: REFERENCE_READER_PASSWORD
+              value: ""
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

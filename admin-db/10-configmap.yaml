@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admin-db-config
+  namespace: navosec-admin
+  labels:
+    app: admin-db
+    navosec.io/tier: admin
+data:
+  # Zentrale Admin-/Registry-DB (In-Cluster). Haelt die Tenant-Registry und
+  # alle Admin-Stammdaten. Owner = navosec_admin (RW, nur die Admin-App).
+  POSTGRES_DB: navosec_admin
+  POSTGRES_USER: navosec_admin
+  # Eigenes Unterverzeichnis, damit der Mount-Root dem non-root-User egal ist.
+  PGDATA: /var/lib/postgresql/data/pgdata

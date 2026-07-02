@@ -60,10 +60,11 @@ spec:
       ports:
         - protocol: UDP
           port: 53
-    # Admin-DB (Tenant-Registry)
+    # Admin-/Registry-DB (In-Cluster StatefulSet im selben Namespace).
     - to:
-        - ipBlock:
-            cidr: 10.0.1.200/32
+        - podSelector:
+            matchLabels:
+              app: admin-db
       ports:
         - protocol: TCP
           port: 5432

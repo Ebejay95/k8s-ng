@@ -1,13 +1,18 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Minimales LOKALES Overlay fuer Docker Desktop.
-# Nimmt nur die Admin-App-Basis. ESO ist lokal nicht installiert, daher
-# wird das ExternalSecret entfernt und ein Fallback-Secret (secret.yaml)
-# verwendet.
+# LOKALES Overlay fuer Docker Desktop – jetzt mit vollem In-Cluster-Datenlayer:
+# Admin-App + Admin-DB + Referenz-DB + Headlamp + MinIO (Velero-Ziel).
+# ESO ist lokal nicht installiert -> ExternalSecrets werden entfernt und durch
+# Fallback-Secrets (secret.yaml, local-secrets.yaml, minio-Modul) ersetzt.
 resources:
+  - ../../reference-db
+  - ../../admin-db
   - ../../admin
+  - ../../headlamp
+  - ../../minio
   - secret.yaml
+  - local-secrets.yaml
 
 # Lokales Dummy-Image (vorher: docker build -t ghcr.io/ebejay95/dummy-admin:latest ./dummy-admin)
 images:
@@ -26,6 +31,26 @@ patches:
       kind: ExternalSecret
       metadata:
         name: navosec-admin-secret
+        namespace: navosec-admin
+  - target:
+      kind: ExternalSecret
+      name: reference-db-credentials
+    patch: |
+      $patch: delete
+      apiVersion: external-secrets.io/v1
+      kind: ExternalSecret
+      metadata:
+        name: reference-db-credentials
+        namespace: reference
+  - target:
+      kind: ExternalSecret
+      name: admin-db-credentials
+    patch: |
+      $patch: delete
+      apiVersion: external-secrets.io/v1
+      kind: ExternalSecret
+      metadata:
+        name: admin-db-credentials
         namespace: navosec-admin
   # lokal nur 1 Replica
   - target:

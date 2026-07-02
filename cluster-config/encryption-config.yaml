@@ -1,0 +1,27 @@
+# APP.4.4.A20 — Verschluesselung der etcd-Daten "at rest".
+#
+# Ablage auf den Control-Plane-Nodes, z.B. /etc/kubernetes/encryption-config.yaml
+# und Start des kube-apiservers mit:
+#   --encryption-provider-config=/etc/kubernetes/encryption-config.yaml
+#
+# Empfehlung Produktion: externen KMS-Provider (kmsv2) statt lokalem aescbc-Key
+# nutzen, damit der Schluessel nicht auf dem Node liegt.
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+      - configmaps
+      - persistentvolumeclaims
+      - "externalsecrets.external-secrets.io"
+    providers:
+      # Bevorzugter Provider zum Schreiben (starke Verschluesselung).
+      - aescbc:
+          keys:
+            - name: key1
+              # 32-Byte Base64-Schluessel; ueber sichere Quelle generieren:
+              #   head -c 32 /dev/urandom | base64
+              secret: CHANGE_ME_BASE64_32_BYTE_KEY
+      # Ermoeglicht das Lesen bereits unverschluesselt gespeicherter Objekte,
+      # bis alle Ressourcen neu geschrieben wurden.
+      - identity: {}

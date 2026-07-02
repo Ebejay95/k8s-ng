@@ -71,8 +71,8 @@ spec:
             - /bin/sh
             - -c
             - |
-              echo "Warte auf Datenbank 10.0.1.200:5432 ..."
-              until nc -z -w 2 10.0.1.200 5432; do
+              echo "Warte auf Datenbank admin-db:5432 ..."
+              until nc -z -w 2 admin-db 5432; do
                 echo "DB nicht erreichbar - retry in 2s"; sleep 2;
               done
               echo "DB erreichbar - Initialisierung erfolgreich"

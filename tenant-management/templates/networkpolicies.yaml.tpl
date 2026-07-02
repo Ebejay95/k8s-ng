@@ -59,9 +59,11 @@ spec:
       ports:
         - protocol: UDP
           port: 53
+    # Tenant-eigene DB (In-Cluster StatefulSet, selber Namespace).
     - to:
-        - ipBlock:
-            cidr: __TENANT_DB_CIDR__
+        - podSelector:
+            matchLabels:
+              app: tenant-db
       ports:
         - protocol: TCP
           port: 5432
@@ -90,3 +92,44 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+---
+# Tenant-DB: nur die Tenant-App darf verbinden.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenant-db-allow-ingress-from-app
+  namespace: tenant-__TENANT_ID__
+spec:
+  podSelector:
+    matchLabels:
+      app: tenant-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: navosec-app
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenant-db-allow-egress-dns
+  namespace: tenant-__TENANT_ID__
+spec:
+  podSelector:
+    matchLabels:
+      app: tenant-db
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53

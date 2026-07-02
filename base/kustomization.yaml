@@ -6,9 +6,11 @@ resources:
   - ../ingress
   - ../external-secrets
   - ../reference-db
+  - ../admin-db
   - ../admin
   - ../ollama
   - ../tenant-management
   - ../observability
   - ../backup
+  - ../headlamp
   - ../argocd

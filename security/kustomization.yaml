@@ -8,3 +8,5 @@ resources:
   - 35-networkpolicies-isolation.yaml
   - 40-kyverno-requirements.yaml
   - 50-limits-and-quotas.yaml
+  - 55-rbac-network-admin.yaml
+  - 56-rbac-storage-admin.yaml

@@ -1,0 +1,32 @@
+# A3 (S6): Nur ausgewaehlte Administrierende duerfen Freigaben fuer
+# Festspeicher (PersistentVolumes) und StorageClasses anlegen oder aendern.
+# Diese ClusterRole wird ausschliesslich an die OIDC-Gruppe der
+# Storage-Administration gebunden.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: storage-admin
+  labels:
+    navosec.io/rbac: storage-admin
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "volumeattachments", "csidrivers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: storage-admin
+  labels:
+    navosec.io/rbac: storage-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: storage-admin
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: "navosec:storage-admins"

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-db
+  namespace: navosec-admin
+  labels:
+    app: admin-db
+    navosec.io/tier: admin
+spec:
+  # Headless: stabile DNS-Identitaet fuer das StatefulSet. Die Admin-App
+  # erreicht die DB unter admin-db.navosec-admin.svc.cluster.local:5432.
+  clusterIP: None
+  selector:
+    app: admin-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

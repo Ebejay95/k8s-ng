@@ -500,3 +500,24 @@ helm install kyverno kyverno/kyverno --namespace kyverno --create-namespace
 # Audit Logs prüfen
 kubectl logs -n kube-system -l component=kube-apiserver | grep audit
 ```
+
+---
+
+## BSI IT-Grundschutz APP.4.4 — Umsetzungsnachweis (Kurzreferenz)
+
+| Anforderung | Umsetzung im Repo |
+|-------------|-------------------|
+| A6 Init-Container | `wait-for-db` initContainer in `admin/30-deployment.yaml` + Tenant-Template |
+| A11 Health-Checks | Probes in allen Deployments; Kyverno `require-health-probes` |
+| A13 Auditierung | `cluster-config/kube-bench-cronjob.yaml`; Kyverno-Policies auf `Enforce` |
+| A3/A12 API-Audit | `cluster-config/audit-policy.yaml` (`--audit-policy-file`) |
+| A3/S6 Storage-RBAC | `security/56-rbac-storage-admin.yaml` |
+| A7/S5 + A18/S4 Netz-RBAC | `security/55-rbac-network-admin.yaml` |
+| A5 Datensicherung | `backup/10-postgres-backup-cronjob.yaml` (Dump+S3), `backup/20-velero-schedule-example.yaml`, `cluster-config/etcd-snapshot-cronjob.yaml` |
+| A19 Hochverfügbarkeit | `topologySpreadConstraints`/AntiAffinity + `admin/65-pdb.yaml` + Tenant-PDB |
+| A20 Verschlüsselung at rest | `cluster-config/encryption-config.yaml`, `cluster-config/encrypted-storageclass.yaml` |
+| A21 Regelmäßiger Restart | `tenant-management/50-scheduled-restart-cronjob.yaml` (täglich, < 24h) |
+| A17 Node-Attestierung | siehe `cluster-config/README.md` (TPM/Secure-Boot, Node-Provisioning) |
+
+> Hinweis: Dateien unter `cluster-config/` sind Control-Plane-/Node-Bootstrap
+> und bewusst **nicht** Teil von `base/kustomization.yaml`.

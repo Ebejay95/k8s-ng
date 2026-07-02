@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: headlamp
+  labels:
+    name: headlamp
+    navosec.io/tier: platform
+    # Headlamp-Image laeuft non-root; baseline reicht und vermeidet Reibung
+    # mit dem Drittanbieter-Image.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

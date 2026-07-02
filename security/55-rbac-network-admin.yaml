@@ -1,0 +1,42 @@
+# A7 (S5) + A18 (S4): Nur ein kleiner, ausgewaehlter Kreis darf das Netz
+# (NetworkPolicies / CNI-Konfiguration) und die als Verbindungskriterium
+# genutzten Labels verwalten. Diese ClusterRole buendelt genau diese Rechte
+# und wird ausschliesslich an die OIDC-Gruppe der Netz-Administration
+# gebunden – normale Nutzende und App-ServiceAccounts erhalten sie NICHT.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: network-policy-admin
+  labels:
+    navosec.io/rbac: network-admin
+rules:
+  # NetworkPolicies (Whitelisting / Mikro-Segmentierung) verwalten
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # CNI-Erweiterungen (Cilium/Calico) – nur falls im Cluster vorhanden
+  - apiGroups: ["cilium.io", "crd.projectcalico.org"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Namespace-Labels sind Verbindungskriterium (A18) und duerfen daher nur
+  # von der Netz-Administration veraendert werden.
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: network-policy-admin
+  labels:
+    navosec.io/rbac: network-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: network-policy-admin
+subjects:
+  # OIDC-Gruppe (Google Workspace) der Netz-Administration. Mitgliederkreis
+  # bewusst klein halten (Least Privilege).
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: "navosec:network-admins"

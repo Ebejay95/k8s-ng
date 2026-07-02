@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio
+  labels:
+    name: minio
+    navosec.io/tier: platform
+    # MinIO-Image laeuft als non-root (uid 1000); baseline genuegt.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

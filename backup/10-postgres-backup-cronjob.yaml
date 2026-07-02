@@ -2,19 +2,27 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: postgres-backup
+  namespace: navosec-prod
 automountServiceAccountToken: false
 ---
+# A5: Naechtliche Datenbank-Sicherung der Control-Plane-DB.
+# Ablauf: Init-Container erstellt den pg_dump, Haupt-Container laedt ihn
+# verschluesselt (TLS) in den S3/MinIO-Bucket. Alle Zugangsdaten kommen aus
+# dem via ExternalSecret (Vaultwarden) bereitgestellten Secret.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: postgres-nightly-backup
+  namespace: navosec-prod
 spec:
   schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
       ttlSecondsAfterFinished: 86400
+      backoffLimit: 2
       template:
         spec:
           serviceAccountName: postgres-backup
@@ -24,10 +32,11 @@ spec:
             runAsNonRoot: true
             runAsUser: 999
             runAsGroup: 999
+            fsGroup: 999
             seccompProfile:
               type: RuntimeDefault
-          containers:
-            - name: backup
+          initContainers:
+            - name: dump
               image: postgres:16
               command:
                 - /bin/sh
@@ -35,22 +44,16 @@ spec:
                 - |
                   set -eu
                   TS=$(date +%Y%m%d-%H%M%S)
-                  OUT=/tmp/navosec-${TS}.sql.gz
-                  pg_dump -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" "${PGDATABASE}" | gzip > ${OUT}
-                  echo "Backup created at ${OUT}. Upload to S3/Minio in next step."
-              env:
-                - name: PGHOST
-                  value: 10.0.1.200
-                - name: PGPORT
-                  value: "5432"
-                - name: PGDATABASE
-                  value: navosec_master
-                - name: PGUSER
-                  value: navosec
-                - name: PGPASSWORD
-                  value: CHANGE_ME
+                  OUT="/backup/${PGDATABASE}-${TS}.sql.gz"
+                  echo "Erzeuge Dump ${OUT}"
+                  pg_dump -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" "${PGDATABASE}" | gzip > "${OUT}"
+                  echo "Dump fertig: $(ls -lh ${OUT})"
+              envFrom:
+                - secretRef:
+                    name: postgres-backup-credentials
               securityContext:
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
                 capabilities:
                   drop: ["ALL"]
               resources:
@@ -60,3 +63,49 @@ spec:
                 limits:
                   cpu: 500m
                   memory: 512Mi
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          containers:
+            - name: upload
+              image: amazon/aws-cli:2.17.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  EP=""
+                  if [ -n "${S3_ENDPOINT:-}" ]; then EP="--endpoint-url ${S3_ENDPOINT}"; fi
+                  for f in /backup/*.sql.gz; do
+                    echo "Lade ${f} nach s3://${S3_BUCKET}/${S3_PREFIX}/"
+                    aws s3 cp "${f}" "s3://${S3_BUCKET}/${S3_PREFIX}/$(basename ${f})" ${EP}
+                  done
+                  echo "Upload abgeschlossen."
+              envFrom:
+                - secretRef:
+                    name: postgres-backup-credentials
+              env:
+                - name: HOME
+                  value: /tmp
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 300m
+                  memory: 256Mi
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: backup
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}

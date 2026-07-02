@@ -1,0 +1,32 @@
+# APP.4.4.A20 — Verschluesselte Datenhaltung der Anwendungsdienste.
+# Verschluesselte PersistentVolumes (LUKS) ueber den CSI-Treiber. Beispiel fuer
+# den Hetzner CSI-Treiber; bei anderen Providern die entsprechenden
+# encryption-Parameter/Secrets setzen.
+#
+# Der Passphrase liegt in einem Secret (idealerweise via ExternalSecret aus
+# Vaultwarden bereitgestellt) und wird beim node-stage referenziert.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: encrypted
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: csi.hetzner.cloud
+parameters:
+  csi.storage.k8s.io/fstype: ext4
+  # LUKS-Verschluesselung aktivieren.
+  csi.storage.k8s.io/node-stage-secret-name: pv-encryption-passphrase
+  csi.storage.k8s.io/node-stage-secret-namespace: kube-system
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+---
+# Passphrase-Secret (Platzhalter). In Produktion via ExternalSecret befuellen.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pv-encryption-passphrase
+  namespace: kube-system
+type: Opaque
+stringData:
+  encryption-passphrase: CHANGE_ME_STRONG_PASSPHRASE

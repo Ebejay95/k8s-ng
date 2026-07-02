@@ -1,0 +1,53 @@
+# APP.4.4.A13 — Automatisiertes Audit gegen einen standardisierten Benchmark
+# (CIS Kubernetes Benchmark) mittels kube-bench.
+# Ergebnis wird in die Pod-Logs geschrieben; von dort kann es der zentrale
+# Log-/Observability-Stack (siehe docs/07) einsammeln und alarmieren.
+#
+# ACHTUNG: benoetigt Host-Zugriff -> Namespace kube-system.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kube-bench
+  namespace: kube-system
+  labels:
+    app: kube-bench
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          hostPID: true
+          nodeSelector:
+            kubernetes.io/os: linux
+          tolerations:
+            - operator: Exists
+          containers:
+            - name: kube-bench
+              image: aquasec/kube-bench:v0.9.1
+              command: ["kube-bench", "run", "--targets", "node", "--json"]
+              volumeMounts:
+                - name: var-lib-kubelet
+                  mountPath: /var/lib/kubelet
+                  readOnly: true
+                - name: etc-systemd
+                  mountPath: /etc/systemd
+                  readOnly: true
+                - name: etc-kubernetes
+                  mountPath: /etc/kubernetes
+                  readOnly: true
+          volumes:
+            - name: var-lib-kubelet
+              hostPath:
+                path: /var/lib/kubelet
+            - name: etc-systemd
+              hostPath:
+                path: /etc/systemd
+            - name: etc-kubernetes
+              hostPath:
+                path: /etc/kubernetes

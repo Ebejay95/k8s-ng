@@ -1,0 +1,44 @@
+# Netzwerkregeln nur fuer den DB-Pod (podSelector app=admin-db). Sobald ein
+# Pod von einer Policy selektiert wird, ist alles Uebrige fuer ihn verboten
+# (default-deny). Der Rest des navosec-admin-Namespace wird davon nicht
+# beeinflusst (dessen Regeln liegen in admin/70-networkpolicies.yaml).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: admin-db-allow-ingress-from-app
+  namespace: navosec-admin
+spec:
+  podSelector:
+    matchLabels:
+      app: admin-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Nur die Admin-App im selben Namespace darf die DB erreichen.
+        - podSelector:
+            matchLabels:
+              app: navosec-admin
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: admin-db-allow-egress-dns
+  namespace: navosec-admin
+spec:
+  podSelector:
+    matchLabels:
+      app: admin-db
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53

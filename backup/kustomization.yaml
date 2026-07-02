@@ -1,7 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: navosec-prod
 
+# Kein globaler namespace-Override: die Velero-Schedule MUSS im Namespace
+# 'velero' verbleiben. Namespaces werden je Ressource explizit gesetzt.
 resources:
+  - 05-externalsecret.yaml
   - 10-postgres-backup-cronjob.yaml
   - 20-velero-schedule-example.yaml
