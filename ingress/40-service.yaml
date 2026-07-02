@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: traefik
+  labels:
+    app: traefik
+spec:
+  # LoadBalancer: in Docker Desktop / bei Cloud-Providern bekommt der
+  # Service eine externe Adresse (lokal: localhost). Das ist die EINE
+  # zentrale Eintrittsstelle ("Ingress-Bastion") fuer den ganzen Cluster.
+  type: LoadBalancer
+  selector:
+    app: traefik
+  ports:
+    - name: web
+      port: 80
+      targetPort: web
+    - name: websecure
+      port: 443
+      targetPort: websecure

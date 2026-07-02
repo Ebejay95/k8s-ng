@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik
+  labels:
+    # Dieser Name wird von den NetworkPolicies referenziert
+    # (namespaceSelector: matchLabels: name=traefik).
+    name: traefik
+    navosec.io/tier: ingress
+    # baseline reicht: Traefik laeuft non-root, braucht aber etwas
+    # mehr Spielraum als restricted (Port-Binding/Provider-Watches).
+    pod-security.kubernetes.io/enforce: baseline

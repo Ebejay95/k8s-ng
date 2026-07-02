@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - ../security
+  - ../ingress
   - ../external-secrets
   - ../admin
   - ../ollama

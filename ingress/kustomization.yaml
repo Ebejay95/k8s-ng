@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Zentraler Ingress-Controller (Traefik) = die eine Eintrittsstelle/
+# Bastion des Clusters. Jede App liefert nur noch eine Ingress-Resource
+# (Routing-Regel), dieser Controller setzt sie um.
+resources:
+  - 00-namespace.yaml
+  - 10-ingressclass.yaml
+  - 20-rbac.yaml
+  - 30-deployment.yaml
+  - 40-service.yaml
