@@ -13,15 +13,15 @@
 # ──────────────────────────────────────────────────────────────────
 
 resource "hcloud_server" "postgres_primary" {
-  count              = var.enable_external_postgres ? 1 : 0
-  name               = "${local.cluster_name}-postgres-primary"
-  image              = "ubuntu-24.04"
-  server_type        = var.postgres_server_type  # z.B. "cx41" (4 vCPU, 16 GB RAM)
-  location           = var.location
-  ssh_keys           = [hcloud_ssh_key.default.id]
-  firewall_ids       = [hcloud_firewall.kubernetes.id]
-  automount          = false
-  delete_protection  = var.environment == "prod" ? true : false
+  count             = var.enable_external_postgres ? 1 : 0
+  name              = "${local.cluster_name}-postgres-primary"
+  image             = "ubuntu-24.04"
+  server_type       = var.postgres_server_type # z.B. "cx41" (4 vCPU, 16 GB RAM)
+  location          = var.location
+  ssh_keys          = [hcloud_ssh_key.default.id]
+  firewall_ids      = [hcloud_firewall.kubernetes.id]
+  user_data         = base64encode(local.postgres_primary_init)
+  delete_protection = var.environment == "prod" ? true : false
 
   labels = merge(
     local.common_labels,
@@ -85,16 +85,13 @@ resource "hcloud_firewall_rule" "postgres" {
 # ──────────────────────────────────────────────────────────────────
 
 locals {
-  postgres_primary_init = templatefile("${path.module}/cloud-init-postgres-primary.sh", {
-    cluster_name = local.cluster_name
+  # Guard: cloud-init nur rendern, wenn die Datei existiert (sonst schlaegt
+  # templatefile() bei deaktiviertem externen Postgres fehl).
+  postgres_primary_init = fileexists("${path.module}/cloud-init-postgres-primary.sh") ? templatefile("${path.module}/cloud-init-postgres-primary.sh", {
+    cluster_name     = local.cluster_name
     postgres_version = var.postgres_version
-    replica_count = var.postgres_replica_count
-  })
-}
-
-resource "hcloud_server" "postgres_primary" {
-  # ... (bereits oben definiert)
-  user_data = base64encode(local.postgres_primary_init)
+    replica_count    = var.postgres_replica_count
+  }) : ""
 }
 
 # ──────────────────────────────────────────────────────────────────

@@ -83,79 +83,85 @@ resource "hcloud_firewall" "kubernetes" {
   labels = local.common_labels
 
   # Erlauben: Ingress Traffic (HTTP/HTTPS)
-  rules = [
-    {
-      direction = "in"
-      protocol  = "tcp"
-      port      = "80"
-      source_ips = [
-        "0.0.0.0/0"
-        "::/0"
-      ]
-    },
-    {
-      direction = "in"
-      protocol  = "tcp"
-      port      = "443"
-      source_ips = [
-        "0.0.0.0/0"
-        "::/0"
-      ]
-    },
-    # SSH (nur für Debugging/emergencies via Bastion)
-    {
-      direction = "in"
-      protocol  = "tcp"
-      port      = "22"
-      source_ips = var.bastion_ssh_cidrs  # Nur von Bastion oder Admin
-    },
-    # Kubelet API (von innen)
-    {
-      direction = "in"
-      protocol  = "tcp"
-      port      = "10250"
-      source_ips = [var.subnet_ip_range]  # Nur aus private network
-    },
-    # CoreDNS (UDP/TCP)
-    {
-      direction = "in"
-      protocol  = "udp"
-      port      = "53"
-      source_ips = [var.subnet_ip_range]
-    },
-    {
-      direction = "in"
-      protocol  = "tcp"
-      port      = "53"
-      source_ips = [var.subnet_ip_range]
-    },
-    # Talos API (für Control Plane)
-    {
-      direction = "in"
-      protocol  = "tcp"
-      port      = "6443"
-      source_ips = concat(var.bastion_ssh_cidrs, [var.subnet_ip_range])
-    },
-    # Allow all outbound
-    {
-      direction = "out"
-      protocol  = "tcp"
-      port      = "1-65535"
-      destination_ips = [
-        "0.0.0.0/0"
-        "::/0"
-      ]
-    },
-    {
-      direction = "out"
-      protocol  = "udp"
-      port      = "1-65535"
-      destination_ips = [
-        "0.0.0.0/0"
-        "::/0"
-      ]
-    }
-  ]
+  rule {
+    direction = "in"
+    protocol  = "tcp"
+    port      = "80"
+    source_ips = [
+      "0.0.0.0/0",
+      "::/0",
+    ]
+  }
+
+  rule {
+    direction = "in"
+    protocol  = "tcp"
+    port      = "443"
+    source_ips = [
+      "0.0.0.0/0",
+      "::/0",
+    ]
+  }
+
+  # SSH (nur für Debugging/emergencies via Bastion)
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "22"
+    source_ips = var.bastion_ssh_cidrs # Nur von Bastion oder Admin
+  }
+
+  # Kubelet API (von innen)
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "10250"
+    source_ips = [var.subnet_ip_range] # Nur aus private network
+  }
+
+  # CoreDNS (UDP/TCP)
+  rule {
+    direction  = "in"
+    protocol   = "udp"
+    port       = "53"
+    source_ips = [var.subnet_ip_range]
+  }
+
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "53"
+    source_ips = [var.subnet_ip_range]
+  }
+
+  # Talos API (für Control Plane)
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "6443"
+    source_ips = concat(var.bastion_ssh_cidrs, [var.subnet_ip_range])
+  }
+
+  # Allow all outbound
+  rule {
+    direction = "out"
+    protocol  = "tcp"
+    port      = "1-65535"
+    destination_ips = [
+      "0.0.0.0/0",
+      "::/0",
+    ]
+  }
+
+  rule {
+    direction = "out"
+    protocol  = "udp"
+    port      = "1-65535"
+    destination_ips = [
+      "0.0.0.0/0",
+      "::/0",
+    ]
+  }
 }
 
 # ──────────────────────────────────────────────────────────────────
