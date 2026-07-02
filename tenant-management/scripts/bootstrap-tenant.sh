@@ -22,6 +22,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOMAIN="${DOMAIN:-meinedomain.de}"
 APP_IMAGE="${APP_IMAGE:-ghcr.io/yourorg/navosec-web:latest}"
 APP_REPLICAS="${APP_REPLICAS:-2}"
+# Stammdaten-/Referenz-DB (Tenant liest read-only). PLATZHALTER-Werte:
+# echte DB-Adresse + Vault-Item spaeter setzen.
+REFERENCE_DB_CIDR="${REFERENCE_DB_CIDR:-10.0.1.201/32}"
+REFERENCE_DB_ITEM_ID="${REFERENCE_DB_ITEM_ID:-CHANGE_ME_REFERENCE_ITEM_ID}"
 
 if ! [[ "${TENANT_ID}" =~ ^[a-z0-9-]+$ ]]; then
   echo "tenant-id must match ^[a-z0-9-]+$"
@@ -37,6 +41,8 @@ apply_tpl() {
     -e "s|__APP_IMAGE__|${APP_IMAGE}|g" \
     -e "s/__APP_REPLICAS__/${APP_REPLICAS}/g" \
     -e "s/__TENANT_DB_CIDR__/10.0.1.200\/32/g" \
+    -e "s|__REFERENCE_DB_CIDR__|${REFERENCE_DB_CIDR}|g" \
+    -e "s/__REFERENCE_DB_ITEM_ID__/${REFERENCE_DB_ITEM_ID}/g" \
     -e "s/__RQ_REQUESTS_CPU__/2/g" \
     -e "s/__RQ_REQUESTS_MEMORY__/4Gi/g" \
     -e "s/__RQ_LIMITS_CPU__/4/g" \
