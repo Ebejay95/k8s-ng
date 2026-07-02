@@ -1,0 +1,40 @@
+---
+# DEMO-RBAC (nur lokales Overlay): erlaubt der Admin-App (ServiceAccount
+# navosec-admin), Tenants direkt ueber die Kubernetes-API zu provisionieren.
+# In prod/staging/test kommt dieselbe Berechtigung aus der tenant-manager
+# ClusterRole (siehe tenant-management/service-account.yaml), die lokal nicht
+# eingebunden ist. Bewusst OHNE Auth im Demo-Kontext.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: navosec-admin-tenant-provisioner
+  labels:
+    app: navosec-admin
+    component: rbac
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["create", "get", "list", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["resourcequotas", "limitranges", "configmaps"]
+    verbs: ["create", "get", "list", "delete", "patch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["create", "get", "list", "delete", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: navosec-admin-tenant-provisioner
+  labels:
+    app: navosec-admin
+    component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: navosec-admin-tenant-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: navosec-admin
+    namespace: navosec-admin

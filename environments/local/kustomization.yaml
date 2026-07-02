@@ -13,6 +13,7 @@ resources:
   - ../../minio
   - secret.yaml
   - local-secrets.yaml
+  - tenant-rbac.yaml
 
 # Lokales Dummy-Image (vorher: docker build -t ghcr.io/ebejay95/dummy-admin:latest ./dummy-admin)
 images:
@@ -60,11 +61,11 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 1
-  # Echtes Pull aus GHCR erzwingen (statt evtl. lokal vorhandenem Image)
+  # Lokal gebautes Image verwenden (docker build -t ghcr.io/ebejay95/dummy-admin:latest ./dummy-admin)
   - target:
       kind: Deployment
       name: navosec-admin
     patch: |
       - op: replace
         path: /spec/template/spec/containers/0/imagePullPolicy
-        value: Always
+        value: IfNotPresent

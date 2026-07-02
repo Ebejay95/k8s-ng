@@ -32,7 +32,9 @@ spec:
         navosec.io/tier: admin
     spec:
       serviceAccountName: navosec-admin
-      automountServiceAccountToken: false
+      # Token wird gemountet, damit die Admin-App die Kubernetes-API fuer
+      # Tenant-Provisionierung ansprechen kann (RBAC: tenant-manager).
+      automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
         fsGroup: 2000
