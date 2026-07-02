@@ -13,6 +13,9 @@ data:
   Tenant__Mode: DedicatedTenant
   Tenant__Id: __TENANT_ID__
   Health__EnableDetailed: "true"
+  # Stammdaten-/Referenz-DB: dieser Tenant liest sie NUR (read-only Rolle).
+  Reference__Enabled: "true"
+  Reference__ReadOnly: "true"
 ---
 apiVersion: v1
 kind: ServiceAccount

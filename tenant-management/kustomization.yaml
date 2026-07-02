@@ -8,3 +8,4 @@ resources:
   - 20-tenant-deletion-job-template.yaml
   - 30-tenant-backup-cronjob.yaml
   - 40-tenant-node-assignment-job-template.yaml
+  - 50-scheduled-restart-cronjob.yaml

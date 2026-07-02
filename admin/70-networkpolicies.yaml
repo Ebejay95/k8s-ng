@@ -39,7 +39,8 @@ spec:
         - protocol: TCP
           port: 8080
 ---
-# Admin-App: DNS, Control-Plane-DB, HTTPS (Google OAuth, Kubernetes-API, ACME)
+# Admin-App Egress: DNS, Admin-DB, Referenz-DB (RW), Tenant-DBs (brokered),
+# HTTPS (Google OAuth, Kubernetes-API, ACME, Vault-API).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -59,9 +60,26 @@ spec:
       ports:
         - protocol: UDP
           port: 53
+    # Admin-DB (Tenant-Registry)
     - to:
         - ipBlock:
             cidr: 10.0.1.200/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Stammdaten-/Referenz-DB (Admin schreibt). PLATZHALTER-IP.
+    - to:
+        - ipBlock:
+            cidr: 10.0.1.201/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Cross-Tenant (brokered): Admin darf on-demand jede Tenant-DB im
+    # Tenant-DB-Netz erreichen. Read-only bzw. welcher Tenant wird ueber
+    # DB-Rollen + Laufzeit-Credentials gesteuert, NICHT hier. PLATZHALTER-CIDR.
+    - to:
+        - ipBlock:
+            cidr: 10.0.2.0/24
       ports:
         - protocol: TCP
           port: 5432

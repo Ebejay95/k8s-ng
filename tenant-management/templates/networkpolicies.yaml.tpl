@@ -65,6 +65,14 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+    # Stammdaten-/Referenz-DB: nur lesend erreichbar (read-only DB-Rolle
+    # erzwingt das eigentliche Nur-Lesen; das Netz erlaubt nur die Verbindung).
+    - to:
+        - ipBlock:
+            cidr: __REFERENCE_DB_CIDR__
+      ports:
+        - protocol: TCP
+          port: 5432
     - to:
         - podSelector:
             matchLabels:

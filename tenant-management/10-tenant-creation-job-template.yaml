@@ -40,6 +40,8 @@ spec:
               NODE_NAME="${NODE_NAME:-}"
               DOMAIN="${DOMAIN:-meinedomain.de}"
               APP_IMAGE="${APP_IMAGE:-ghcr.io/yourorg/navosec-web:latest}"
+              # Stammdaten-/Referenz-DB (Tenant liest read-only). PLATZHALTER.
+              REFERENCE_DB_CIDR="${REFERENCE_DB_CIDR:-10.0.1.201/32}"
 
               case "$PLAN" in
                 free)
@@ -191,6 +193,13 @@ spec:
                     ports:
                       - protocol: TCP
                         port: 5432
+                  # Stammdaten-/Referenz-DB: nur lesend (read-only DB-Rolle).
+                  - to:
+                      - ipBlock:
+                          cidr: ${REFERENCE_DB_CIDR}
+                    ports:
+                      - protocol: TCP
+                        port: 5432
                   - to:
                       - podSelector:
                           matchLabels:
@@ -222,6 +231,8 @@ spec:
                 Tenant__Mode: DedicatedTenant
                 Tenant__Id: ${TENANT_ID}
                 Health__EnableDetailed: "true"
+                Reference__Enabled: "true"
+                Reference__ReadOnly: "true"
               ---
               apiVersion: v1
               kind: ServiceAccount
@@ -242,6 +253,11 @@ spec:
                   tenant.navosec/id: ${TENANT_ID}
               spec:
                 replicas: ${APP_REPLICAS}
+                strategy:
+                  type: RollingUpdate
+                  rollingUpdate:
+                    maxUnavailable: 0
+                    maxSurge: 1
                 selector:
                   matchLabels:
                     app: navosec-app
@@ -265,6 +281,45 @@ spec:
                       fsGroup: 2000
                       seccompProfile:
                         type: RuntimeDefault
+                    # A19: Replikas auf dem/den dedizierten Tenant-Node(s)
+                    # bevorzugt verteilen.
+                    affinity:
+                      podAntiAffinity:
+                        preferredDuringSchedulingIgnoredDuringExecution:
+                          - weight: 100
+                            podAffinityTerm:
+                              topologyKey: kubernetes.io/hostname
+                              labelSelector:
+                                matchLabels:
+                                  app: navosec-app
+                    # A6: Initialisierung im eigenen Init-Container. Der App-
+                    # Container startet erst, wenn die DB erreichbar ist.
+                    initContainers:
+                      - name: wait-for-db
+                        image: busybox:1.36
+                        command:
+                          - /bin/sh
+                          - -c
+                          - |
+                            echo "Warte auf Datenbank 10.0.1.200:5432 ..."
+                            until nc -z -w 2 10.0.1.200 5432; do
+                              echo "DB nicht erreichbar - retry in 2s"; sleep 2;
+                            done
+                            echo "DB erreichbar - Initialisierung erfolgreich"
+                        securityContext:
+                          runAsNonRoot: true
+                          runAsUser: 2000
+                          allowPrivilegeEscalation: false
+                          readOnlyRootFilesystem: true
+                          capabilities:
+                            drop: ["ALL"]
+                        resources:
+                          requests:
+                            cpu: 10m
+                            memory: 16Mi
+                          limits:
+                            cpu: 50m
+                            memory: 32Mi
                     containers:
                       - name: app
                         image: ${APP_IMAGE}
@@ -359,6 +414,20 @@ spec:
                               name: navosec-app
                               port:
                                 number: 80
+              ---
+              apiVersion: policy/v1
+              kind: PodDisruptionBudget
+              metadata:
+                name: navosec-app
+                namespace: ${NS}
+                labels:
+                  app: navosec-app
+                  tenant.navosec/id: ${TENANT_ID}
+              spec:
+                minAvailable: 1
+                selector:
+                  matchLabels:
+                    app: navosec-app
               EOF
 
               echo "Deploying mandatory dedicated ollama for tenant ${TENANT_ID}"
@@ -526,6 +595,10 @@ spec:
               value: 10.0.1.200
             - name: TENANT_DB_PORT
               value: "5432"
+            - name: REFERENCE_DB_HOST
+              value: 10.0.1.201
+            - name: REFERENCE_DB_CIDR
+              value: 10.0.1.201/32
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

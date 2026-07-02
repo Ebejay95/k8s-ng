@@ -11,5 +11,6 @@ resources:
   - 40-service.yaml
   - 50-ingress.yaml
   - 60-hpa.yaml
+  - 65-pdb.yaml
   - 70-networkpolicies.yaml
   - 80-limits-and-quotas.yaml

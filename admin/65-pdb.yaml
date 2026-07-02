@@ -1,0 +1,15 @@
+# A19/A21: PodDisruptionBudget sichert waehrend Node-Drain, Updates und
+# geplanten Neustarts (siehe scheduled-restart) die Verfuegbarkeit der
+# Admin-Control-Plane.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: navosec-admin
+  namespace: navosec-admin
+  labels:
+    app: navosec-admin
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: navosec-admin

@@ -16,3 +16,8 @@ spec:
       remoteRef:
         key: __DB_ITEM_ID__
         property: connection-string
+    # Stammdaten-/Referenz-DB mit READ-ONLY Rolle (Tenant liest nur).
+    - secretKey: ConnectionStrings__Reference
+      remoteRef:
+        key: __REFERENCE_DB_ITEM_ID__
+        property: reference-connection-ro

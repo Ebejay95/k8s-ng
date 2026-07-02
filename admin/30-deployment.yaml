@@ -16,6 +16,12 @@ metadata:
     navosec.io/tier: admin
 spec:
   replicas: 2
+  # A19: rollierendes Update haelt bei Restart/Update die Verfuegbarkeit
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: navosec-admin
@@ -32,6 +38,58 @@ spec:
         fsGroup: 2000
         seccompProfile:
           type: RuntimeDefault
+      # A19: Replikas ueber Nodes/Zonen verteilen (Ausfall eines
+      # Brandabschnitts fuehrt nicht zum Ausfall der Anwendung)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: navosec-admin
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: navosec-admin
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: navosec-admin
+      # A6: Initialisierung im eigenen Init-Container. Weitere Container
+      # starten erst nach erfolgreicher Initialisierung (DB erreichbar).
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Warte auf Datenbank 10.0.1.200:5432 ..."
+              until nc -z -w 2 10.0.1.200 5432; do
+                echo "DB nicht erreichbar - retry in 2s"; sleep 2;
+              done
+              echo "DB erreichbar - Initialisierung erfolgreich"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 2000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
       containers:
         - name: app
           image: ghcr.io/yourorg/navosec-web:latest

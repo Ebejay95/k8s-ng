@@ -13,3 +13,11 @@ data:
   Tenant__Mode: Admin
   Tenant__IsAdmin: "true"
   Health__EnableDetailed: "true"
+  # Stammdaten-/Referenz-DB: die Admin-App ist Eigentuemer (schreibend).
+  # Tenants lesen dieselbe DB read-only (eigene DB-Rolle).
+  Reference__Enabled: "true"
+  # Cross-Tenant-Zugriff: App-Admins duerfen (brokered + auditiert) auf
+  # Tenant-DBs zugreifen. Die Zugangsdaten werden ZUR LAUFZEIT pro Tenant
+  # aus dem Vault geholt und NICHT dauerhaft im Admin-Secret vorgehalten.
+  Admin__CrossTenant__Enabled: "true"
+  Admin__CrossTenant__AuditRequired: "true"

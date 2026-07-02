@@ -1,0 +1,74 @@
+# A21: Regelmaessiger Neustart der Pods (kein Pod laeuft laenger als 24h).
+# Nutzt 'kubectl rollout restart', wodurch die Deployments rollierend
+# (maxUnavailable=0 + PDB) neu gestartet werden und die Verfuegbarkeit
+# erhalten bleibt. Verwendet den bestehenden tenant-manager ServiceAccount
+# (Kyverno-Ausnahme fuer den API-Token).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: scheduled-pod-restart
+  namespace: navosec-prod
+  labels:
+    app: tenant-management
+    component: hardening
+spec:
+  # Taeglich 04:00 -> maximale Pod-Lebensdauer < 24h
+  schedule: "0 4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: tenant-management
+            component: hardening
+        spec:
+          serviceAccountName: tenant-manager
+          automountServiceAccountToken: true
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rollout-restart
+              image: bitnami/kubectl:1.30
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  echo "Neustart Admin-Control-Plane"
+                  kubectl rollout restart deployment/navosec-admin -n navosec-admin
+                  echo "Neustart aller Tenant-Apps"
+                  kubectl rollout restart deployment -l app=navosec-app -A
+                  echo "Neustart aller Ollama-Instanzen"
+                  kubectl rollout restart deployment -l app=ollama -A
+                  echo "Geplanter Neustart abgeschlossen."
+              env:
+                - name: HOME
+                  value: /tmp
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
