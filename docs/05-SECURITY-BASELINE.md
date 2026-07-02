@@ -510,12 +510,12 @@ kubectl logs -n kube-system -l component=kube-apiserver | grep audit
 | A6 Init-Container | `wait-for-db` initContainer in `admin/30-deployment.yaml` + Tenant-Template |
 | A11 Health-Checks | Probes in allen Deployments; Kyverno `require-health-probes` |
 | A13 Auditierung | `cluster-config/kube-bench-cronjob.yaml`; Kyverno-Policies auf `Enforce` |
-| A3/A12 API-Audit | `cluster-config/audit-policy.yaml` (`--audit-policy-file`) |
+| A3/A12 API-Audit | `talos/patches/controlplane.yaml` (inline `auditPolicy`, Talos setzt `--audit-policy-file`) |
 | A3/S6 Storage-RBAC | `security/56-rbac-storage-admin.yaml` |
 | A7/S5 + A18/S4 Netz-RBAC | `security/55-rbac-network-admin.yaml` |
 | A5 Datensicherung | `backup/10-postgres-backup-cronjob.yaml` (Dump+S3), `backup/20-velero-schedule-example.yaml`, `cluster-config/etcd-snapshot-cronjob.yaml` |
 | A19 Hochverfügbarkeit | `topologySpreadConstraints`/AntiAffinity + `admin/65-pdb.yaml` + Tenant-PDB |
-| A20 Verschlüsselung at rest | `cluster-config/encryption-config.yaml`, `cluster-config/encrypted-storageclass.yaml` |
+| A20 Verschlüsselung at rest | `talos/patches/controlplane.yaml` (`encryption-provider-config` + LUKS2-Disk), `cluster-config/encrypted-storageclass.yaml` |
 | A21 Regelmäßiger Restart | `tenant-management/50-scheduled-restart-cronjob.yaml` (täglich, < 24h) |
 | A17 Node-Attestierung | siehe `cluster-config/README.md` (TPM/Secure-Boot, Node-Provisioning) |
 

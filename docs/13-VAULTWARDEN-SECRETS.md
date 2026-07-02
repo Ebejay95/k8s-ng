@@ -37,7 +37,7 @@ Wenn dein "PSK" ein eigener API-Gateway-Header ist, kann man das zusaetzlich dav
 
 - `external-secrets/` enthaelt Vaultwarden-Bridge + SecretStores
 - `app/21-externalsecret-navosec-app.yaml` erstellt `navosec-app-secret` automatisch
-- `app/20-secret-template.yaml` ist optionaler Legacy-Fallback und wird im Standard-Flow nicht mehr verwendet
+- Ein statisches Secret-Template wird nicht mehr vorgehalten; im Standard-Flow erzeugt ausschliesslich das ExternalSecret (`admin/21-externalsecret.yaml`) das Secret (lokal: `environments/local/secret.yaml`)
 
 ---
 

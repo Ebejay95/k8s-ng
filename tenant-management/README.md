@@ -7,24 +7,28 @@ Diese Ordner enthält alle Kubernetes Ressourcen für automatisierte Tenant-Verw
 ```
 tenant-management/
 ├── README.md (dieses File)
-├── kustomization.yaml
+├── kustomization.yaml            ← deployt NUR SA + Scheduled-Restart
 ├── service-account.yaml          ← RBAC für Tenant Manager
-├── 10-tenant-creation-job-template.yaml
-├── 20-tenant-deletion-job-template.yaml
-├── 30-tenant-backup-cronjob.yaml
-├── 40-tenant-node-assignment-job-template.yaml  ← Node je Tenant pinnen
-├── templates/
+├── 50-scheduled-restart-cronjob.yaml  ← A21: tägl. rollierender Neustart (<24h)
+├── templates/                    ← EINZIGER Provisioning-Pfad (via Skripte)
 │   ├── namespace.yaml.tpl
 │   ├── networkpolicies.yaml.tpl
 │   ├── limits-and-quotas.yaml.tpl
-│   ├── db-externalsecret.yaml.tpl
+│   ├── db.yaml.tpl
 │   ├── app.yaml.tpl              ← dedizierte App + Service + Ingress je Tenant
 │   └── ollama-dedicated.yaml.tpl  ← verpflichtend je Tenant
 └── scripts/
   ├── assign-node.sh             ← Node-Pinning (Label + Taint)
-  ├── bootstrap-tenant.sh
-  └── delete-tenant.sh
+  ├── bootstrap-tenant.sh        ← Tenant anlegen (wendet templates/*.tpl an)
+  └── delete-tenant.sh           ← Tenant entfernen
 ```
+
+> **Hinweis:** Frühere Job-Manifeste (`10-tenant-creation-*`, `20-tenant-deletion-*`,
+> `30-tenant-backup-*`, `40-tenant-node-assignment-*`) wurden entfernt. Sie
+> duplizierten die `templates/*.tpl` + `scripts/*.sh` und schlugen bei direktem
+> `kubectl apply` fehl. Provisioning läuft ausschließlich über die Skripte
+> (bzw. die Admin-API, die dieselben Templates nutzt). Per-Tenant-Datensicherung
+> übernimmt Velero (Schedule `tenants-daily`, PV-Ebene).
 
 ## Usage
 

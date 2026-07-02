@@ -15,7 +15,7 @@
 #     --patch @talos/patches/controlplane.yaml -o controlplane.yaml
 machine:
   # Datei mit dem Verschluesselungs-Provider fuer den API-Server.
-  # Inhalt muss cluster-config/encryption-config.yaml entsprechen.
+  # Dies ist die AUTORITATIVE Quelle (Talos bettet sie inline ein).
   # Schluessel VOR dem Ausrollen ersetzen:  head -c 32 /dev/urandom | base64
   files:
     - path: /etc/kubernetes/encryption-config.yaml
@@ -80,7 +80,7 @@ cluster:
         readonly: true
     # Talos schreibt diese Policy nach /etc/kubernetes/audit-policy.yaml und
     # setzt --audit-policy-file + --audit-log-path automatisch.
-    # Inhalt spiegelt cluster-config/audit-policy.yaml.
+    # Dies ist die AUTORITATIVE Audit-Policy des Clusters.
     auditPolicy:
       apiVersion: audit.k8s.io/v1
       kind: Policy

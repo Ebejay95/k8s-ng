@@ -72,7 +72,7 @@ spec:
             - configMapRef:
                 name: navosec-app-config
             - secretRef:
-                # wird von db-externalsecret.yaml.tpl aus Vaultwarden befuellt
+                # wird von db.yaml.tpl aus Vaultwarden befuellt
                 name: tenant-db-secret
           resources:
             requests:

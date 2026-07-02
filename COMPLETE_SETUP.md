@@ -58,9 +58,9 @@ k8s-ng/
 │
 ├── tenant-management/
 │   ├── service-account.yaml          RBAC für Tenant Manager
-│   ├── tenant-creation-job.yaml      Job Template (Create)
-│   ├── tenant-deletion-job.yaml      Job Template (Delete)
-│   └── tenant-backup-cronjob.yaml    Nightly Backups
+│   ├── 50-scheduled-restart-cronjob.yaml  A21: rollierender Neustart
+│   ├── templates/*.yaml.tpl          Provisioning-Templates (via Skripte)
+│   └── scripts/*.sh                  bootstrap/delete/assign-node
 │
 ├── observability/
 │   ├── prometheus-agent.yaml         In-Cluster Agent (remote_write)
@@ -346,8 +346,8 @@ helm install argocd argo/argo-cd -f ../argocd/values.yaml
 # 5. Security Baseline
 kubectl apply -f ../security/
 
-# 6. First Tenant
-kubectl apply -f ../tenant-management/tenant-creation-job.yaml
+# 6. First Tenant (Provisioning via Skript, nicht per kubectl apply)
+cd ../tenant-management && ./scripts/bootstrap-tenant.sh <tenant-id> <bitwarden-db-item-id> <node-name>
 
 # 7. Monitoring
 kubectl apply -f ../observability/

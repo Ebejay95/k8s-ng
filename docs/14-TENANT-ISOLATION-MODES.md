@@ -41,9 +41,8 @@ Node-Ausrollung (zweistufig, admin-steuerbar):
 
 1. **Infrastruktur:** `terraform/hetzner/tenant-nodes.tf` legt je Tenant einen
    eigenen Hetzner-Server an (`var.tenant_nodes`).
-2. **Scheduling:** `scripts/assign-node.sh` bzw. der Job
-   `40-tenant-node-assignment-job-template.yaml` pinnt den Node an den Tenant
-   (Label + Taint). Beides kann aus der Admin-App ueber die Kubernetes-API
+2. **Scheduling:** `scripts/assign-node.sh` pinnt den Node an den Tenant
+   (Label + Taint). Dies kann aus der Admin-App ueber die Kubernetes-API
    ausgeloest werden (RoleBinding `admin-app-tenant-orchestrator`).
 
 ## AI: verpflichtend dediziertes Ollama
@@ -61,17 +60,13 @@ Node-Ausrollung (zweistufig, admin-steuerbar):
   - `admin/` (Namespace, ConfigMap, ExternalSecret, Deployment, Service,
     Ingress, HPA, NetworkPolicies, Limits/Quotas)
 
-- Templates fuer voll dedizierte Tenant-Stacks:
+- Templates fuer voll dedizierte Tenant-Stacks (einziger Provisioning-Pfad):
   - `tenant-management/templates/namespace.yaml.tpl`
   - `tenant-management/templates/networkpolicies.yaml.tpl`
   - `tenant-management/templates/limits-and-quotas.yaml.tpl`
-  - `tenant-management/templates/db-externalsecret.yaml.tpl`
+  - `tenant-management/templates/db.yaml.tpl`
   - `tenant-management/templates/app.yaml.tpl` (App + Service + Ingress je Tenant)
   - `tenant-management/templates/ollama-dedicated.yaml.tpl` (verpflichtend)
-
-- Job-Templates (admin-/API-steuerbar):
-  - `tenant-management/10-tenant-creation-job-template.yaml`
-  - `tenant-management/40-tenant-node-assignment-job-template.yaml`
 
 - Infrastruktur:
   - `terraform/hetzner/tenant-nodes.tf` (dedizierte Nodes je Tenant)
@@ -107,10 +102,9 @@ Ergebnis:
 
 ### 2) Steuerung aus der Admin-App (Ziel)
 
-Die Admin-App erstellt ueber die Kubernetes-API Instanzen von
-`40-tenant-node-assignment-job-template.yaml` und
-`10-tenant-creation-job-template.yaml` (Variablen `TENANT_ID`, `NODE_NAME`,
-`PLAN`, `DOMAIN`). Die Berechtigung dafuer liefert das RoleBinding
+Die Admin-App wendet ueber die Kubernetes-API dieselben `templates/*.tpl` an
+(Variablen `TENANT_ID`, `NODE_NAME`, `PLAN`, `DOMAIN`) bzw. stoesst die Skripte
+an. Die Berechtigung dafuer liefert das RoleBinding
 `admin-app-tenant-orchestrator` (ServiceAccount `navosec-admin`).
 
 ---
