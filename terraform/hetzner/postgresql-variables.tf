@@ -1,9 +1,9 @@
 # hetzner-postgresql-variables.tf – PostgreSQL-spezifische Variablen
 
 variable "enable_external_postgres" {
-  description = "PostgreSQL auf externen Hetzner-Servern (außerhalb K8s)?"
+  description = "PostgreSQL auf externen Hetzner-Servern (außerhalb K8s)? Standardmaessig AUS: alle DBs (admin/reference/tenant) laufen jetzt als StatefulSets im Cluster. Nur auf true setzen, wenn wieder externe DB-VMs gewuenscht sind."
   type        = bool
-  default     = true  # Best Practice: DB außerhalb des Clusters
+  default     = false  # DBs laufen in-cluster (admin-db/reference-db/tenant-db StatefulSets)
 }
 
 variable "postgres_server_type" {
