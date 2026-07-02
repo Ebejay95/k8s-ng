@@ -1,0 +1,70 @@
+# NetworkPolicies fuer das lokale MinIO-Backup-Ziel (BSI APP.4.4.A7 -
+# Netzsegmentierung). Erfordert eine NetworkPolicy-durchsetzende CNI
+# (Cilium/Calico). Docker Desktop erzwingt NPs NICHT - die Policies sind
+# dennoch deklarativ korrekt und greifen in prod/staging.
+#
+# Default-Deny: alles im Namespace verboten, ausser explizit erlaubt.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: minio
+  labels:
+    app: minio
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Nur Velero (node-agent/fs-backup) und der cluster-interne bucket-Job duerfen
+# die S3-API (9000) bzw. Console (9001) erreichen.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-minio-ingress
+  namespace: minio
+  labels:
+    app: minio
+spec:
+  podSelector:
+    matchLabels:
+      app: minio
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: velero
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 9001
+---
+# MinIO selbst braucht nur DNS-Aufloesung nach aussen.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: minio
+  labels:
+    app: minio
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

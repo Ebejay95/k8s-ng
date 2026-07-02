@@ -92,8 +92,8 @@ spec:
                 name: ${NS}
                 labels:
                   name: ${NS}
-                  tenant.navosec/id: ${TENANT_ID}
-                  tenant.navosec/plan: ${PLAN}
+                  tenant.navosec.io/id: ${TENANT_ID}
+                  tenant.navosec.io/plan: ${PLAN}
                   navosec.io/tier: tenant
                   pod-security.kubernetes.io/enforce: restricted
                   pod-security.kubernetes.io/enforce-version: latest
@@ -292,7 +292,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: tenant-db
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               data:
                 POSTGRES_DB: navosec_tenant
                 POSTGRES_USER: navosec_tenant
@@ -305,7 +305,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: tenant-db
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               spec:
                 serviceName: tenant-db
                 replicas: 1
@@ -316,7 +316,7 @@ spec:
                   metadata:
                     labels:
                       app: tenant-db
-                      tenant.navosec/id: ${TENANT_ID}
+                      tenant.navosec.io/id: ${TENANT_ID}
                   spec:
                     automountServiceAccountToken: false
                     nodeSelector:
@@ -393,7 +393,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: tenant-db
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               spec:
                 clusterIP: None
                 selector:
@@ -413,7 +413,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: navosec-app
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               data:
                 ASPNETCORE_URLS: http://+:8080
                 ASPNETCORE_ENVIRONMENT: Production
@@ -430,7 +430,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: navosec-app
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               ---
               apiVersion: apps/v1
               kind: Deployment
@@ -439,7 +439,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: navosec-app
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               spec:
                 replicas: ${APP_REPLICAS}
                 strategy:
@@ -454,7 +454,7 @@ spec:
                   metadata:
                     labels:
                       app: navosec-app
-                      tenant.navosec/id: ${TENANT_ID}
+                      tenant.navosec.io/id: ${TENANT_ID}
                   spec:
                     serviceAccountName: navosec-app
                     automountServiceAccountToken: false
@@ -567,7 +567,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: navosec-app
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               spec:
                 selector:
                   app: navosec-app
@@ -585,7 +585,7 @@ spec:
                   cert-manager.io/cluster-issuer: letsencrypt-prod
                 labels:
                   app: navosec-app
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               spec:
                 ingressClassName: traefik
                 tls:
@@ -611,7 +611,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: navosec-app
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               spec:
                 minAvailable: 1
                 selector:
@@ -628,7 +628,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: ollama
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               automountServiceAccountToken: false
               ---
               apiVersion: v1
@@ -638,7 +638,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: ollama
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               spec:
                 accessModes: ["ReadWriteOnce"]
                 resources:
@@ -652,7 +652,7 @@ spec:
                 namespace: ${NS}
                 labels:
                   app: ollama
-                  tenant.navosec/id: ${TENANT_ID}
+                  tenant.navosec.io/id: ${TENANT_ID}
               spec:
                 replicas: 1
                 selector:
@@ -662,7 +662,7 @@ spec:
                   metadata:
                     labels:
                       app: ollama
-                      tenant.navosec/id: ${TENANT_ID}
+                      tenant.navosec.io/id: ${TENANT_ID}
                   spec:
                     serviceAccountName: ollama
                     automountServiceAccountToken: false

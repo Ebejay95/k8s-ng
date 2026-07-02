@@ -1,0 +1,105 @@
+# Talos-Machine-Config-Patch fuer CONTROL-PLANE-Nodes.
+#
+# Dieser Patch verdrahtet die bislang nur "abgelegten" node-level BSI-Configs
+# tatsaechlich in den kube-apiserver und aktiviert Disk-Encryption:
+#   * APP.4.4.A20 - etcd/Secrets "at rest" verschluesselt (encryption-provider-config)
+#   * APP.4.4.A3/A12 - API-Audit-Log aktiv, anonyme Auth aus
+#   * APP.4.4.A20 - System-/Ephemeral-Disk mit LUKS2 verschluesselt
+#   * Cilium als CNI (Talos-eigenes CNI + kube-proxy deaktiviert)
+#
+# Anwenden:
+#   talosctl gen config <cluster> https://<endpoint>:6443 \
+#     --config-patch-control-plane @talos/patches/controlplane.yaml
+# oder auf bestehende Config:
+#   talosctl machineconfig patch controlplane.yaml \
+#     --patch @talos/patches/controlplane.yaml -o controlplane.yaml
+machine:
+  # Datei mit dem Verschluesselungs-Provider fuer den API-Server.
+  # Inhalt muss cluster-config/encryption-config.yaml entsprechen.
+  # Schluessel VOR dem Ausrollen ersetzen:  head -c 32 /dev/urandom | base64
+  files:
+    - path: /etc/kubernetes/encryption-config.yaml
+      permissions: 0o600
+      op: create
+      content: |-
+        apiVersion: apiserver.config.k8s.io/v1
+        kind: EncryptionConfiguration
+        resources:
+          - resources:
+              - secrets
+              - configmaps
+              - persistentvolumeclaims
+              - "externalsecrets.external-secrets.io"
+            providers:
+              - aescbc:
+                  keys:
+                    - name: key1
+                      secret: CHANGE_ME_BASE64_32_BYTE_KEY
+              - identity: {}
+
+  # Disk-Encryption (LUKS2).
+  #  - Bare-Metal (Hetzner Dedicated) mit TPM 2.0: `tpm: {}` -> Measured Boot /
+  #    Schluessel im TPM versiegelt (APP.4.4.A17-naher Schutz).
+  #  - Hetzner CLOUD (kein vTPM): TPM-Block entfernen und stattdessen
+  #    `nodeID: {}` verwenden (Schluessel aus Node-Identitaet abgeleitet) ODER
+  #    `kms:` mit externem Key-Server.
+  systemDiskEncryption:
+    state:
+      provider: luks2
+      keys:
+        - slot: 0
+          tpm: {}
+          # --- Hetzner Cloud Fallback (kein vTPM) ---
+          # nodeID: {}
+    ephemeral:
+      provider: luks2
+      keys:
+        - slot: 0
+          tpm: {}
+          # nodeID: {}
+
+cluster:
+  # Kein Talos-CNI - Cilium uebernimmt (siehe cni/).
+  network:
+    cni:
+      name: none
+  # kube-proxy aus: Cilium ersetzt es (kubeProxyReplacement=true).
+  proxy:
+    disabled: true
+
+  apiServer:
+    extraArgs:
+      encryption-provider-config: /etc/kubernetes/encryption-config.yaml
+      anonymous-auth: "false"
+      audit-log-maxage: "30"
+      audit-log-maxbackup: "10"
+      audit-log-maxsize: "100"
+    extraVolumes:
+      - hostPath: /etc/kubernetes/encryption-config.yaml
+        mountPath: /etc/kubernetes/encryption-config.yaml
+        readonly: true
+    # Talos schreibt diese Policy nach /etc/kubernetes/audit-policy.yaml und
+    # setzt --audit-policy-file + --audit-log-path automatisch.
+    # Inhalt spiegelt cluster-config/audit-policy.yaml.
+    auditPolicy:
+      apiVersion: audit.k8s.io/v1
+      kind: Policy
+      omitStages:
+        - RequestReceived
+      rules:
+        - level: None
+          verbs: ["get", "list", "watch"]
+          resources:
+            - group: ""
+              resources: ["events", "nodes/status", "pods/status"]
+        - level: RequestResponse
+          resources:
+            - group: "rbac.authorization.k8s.io"
+              resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+        - level: Metadata
+          resources:
+            - group: ""
+              resources: ["secrets", "configmaps"]
+        - level: Metadata
+          verbs: ["create", "update", "patch", "delete", "deletecollection"]
+        - level: Metadata

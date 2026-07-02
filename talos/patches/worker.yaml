@@ -1,0 +1,35 @@
+# Talos-Machine-Config-Patch fuer WORKER-Nodes.
+#
+# CNI/kube-proxy werden clusterweit ueber die Control-Plane-Config gesteuert
+# (siehe controlplane.yaml). Worker brauchen hier v.a. Disk-Encryption und
+# ergaenzende Kubelet-Absicherung.
+#
+# Anwenden:
+#   talosctl machineconfig patch worker.yaml \
+#     --patch @talos/patches/worker.yaml -o worker.yaml
+machine:
+  # Disk-Encryption analog Control-Plane.
+  #  - Bare-Metal mit TPM 2.0: `tpm: {}`
+  #  - Hetzner Cloud (kein vTPM): TPM-Block durch `nodeID: {}` ersetzen.
+  systemDiskEncryption:
+    state:
+      provider: luks2
+      keys:
+        - slot: 0
+          tpm: {}
+          # nodeID: {}
+    ephemeral:
+      provider: luks2
+      keys:
+        - slot: 0
+          tpm: {}
+          # nodeID: {}
+
+  kubelet:
+    extraArgs:
+      # Anonyme Kubelet-Requests unterbinden, Autorisierung ueber Webhook.
+      anonymous-auth: "false"
+      authorization-mode: "Webhook"
+    # Nur die tatsaechlich genutzten Read-only-Ports/Endpunkte offen lassen.
+    extraConfig:
+      serverTLSBootstrap: true

@@ -1,0 +1,73 @@
+# NetworkPolicies fuer Headlamp (BSI APP.4.4.A7 - Netzsegmentierung).
+# Erfordert eine NetworkPolicy-durchsetzende CNI (Cilium/Calico).
+#
+# Default-Deny: alles im Namespace verboten, ausser explizit erlaubt.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: headlamp
+  labels:
+    app: headlamp
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Eingang NUR vom Traefik-Ingress (kein direkter Pod-zu-Pod-Zugriff).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-traefik
+  namespace: headlamp
+  labels:
+    app: headlamp
+spec:
+  podSelector:
+    matchLabels:
+      app: headlamp
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+      ports:
+        - protocol: TCP
+          port: 4466
+---
+# Ausgang: DNS-Aufloesung + Zugriff auf den Kubernetes-API-Server
+# (ClusterIP 443 / Node-Port 6443), damit die UI den Clusterzustand liest.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns-apiserver
+  namespace: headlamp
+  labels:
+    app: headlamp
+spec:
+  podSelector:
+    matchLabels:
+      app: headlamp
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443

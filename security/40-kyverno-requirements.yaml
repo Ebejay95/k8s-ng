@@ -55,8 +55,8 @@ spec:
               runAsNonRoot: true
 ---
 # A11: Erzwingt, dass langlaufende Workloads readiness- und liveness-Checks
-# definieren. Audit-Modus, damit Bestands-Workloads sichtbar, aber nicht
-# hart blockiert werden.
+# definieren. Enforce-Modus: Deployments/StatefulSets ohne Probes in den
+# gescopten Namespaces werden abgewiesen (BSI: Verfuegbarkeit/Selbstheilung).
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -66,7 +66,7 @@ metadata:
     policies.kyverno.io/category: Reliability
     policies.kyverno.io/severity: medium
 spec:
-  validationFailureAction: Audit
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: require-liveness-readiness

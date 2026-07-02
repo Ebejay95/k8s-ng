@@ -1,0 +1,84 @@
+# Cilium – Helm-Values fuer Talos + Hetzner Cloud.
+#
+# Cilium ist das CNI der Wahl, weil es:
+#   * NetworkPolicies TATSAECHLICH durchsetzt (Docker Desktop tut das nicht) -> APP.4.4.A7
+#   * Node-zu-Node-Verkehr per WireGuard transparent verschluesselt -> APP.4.4.A20 (in-transit)
+#   * kube-proxy ersetzt (weniger Angriffsflaeche, bessere Performance)
+#   * Hubble fuer Netzwerk-Observability liefert
+#
+# Installation siehe cni/README.md bzw. cni/install.sh (Bootstrap via Helm,
+# NICHT via Kustomize/ArgoCD - das CNI muss vor allem anderen laufen).
+
+# --- Talos-Spezifika ---------------------------------------------------------
+# Talos stellt den API-Server lokal ueber KubePrism auf 127.0.0.1:7445 bereit.
+k8sServiceHost: localhost
+k8sServicePort: 7445
+
+# kube-proxy ist in der Talos-Config deaktiviert (proxy.disabled=true) -> Cilium
+# uebernimmt vollstaendig.
+kubeProxyReplacement: true
+
+# Talos-konforme cgroup-/Security-Einstellungen.
+cgroup:
+  autoMount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+
+securityContext:
+  capabilities:
+    ciliumAgent:
+      - CHOWN
+      - KILL
+      - NET_ADMIN
+      - NET_RAW
+      - IPC_LOCK
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    cleanCiliumState:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+
+# --- Netzwerk ---------------------------------------------------------------
+ipam:
+  mode: kubernetes
+# Tunnel (VXLAN) ist auf Hetzner Cloud am robustesten (kein natives Routing/BGP
+# ueber das private Netz noetig).
+routingMode: tunnel
+tunnelProtocol: vxlan
+
+# --- Verschluesselung (in-transit) ------------------------------------------
+encryption:
+  enabled: true
+  type: wireguard
+  # Auch Pod-zu-Pod ueber denselben Node verschluesseln.
+  nodeEncryption: true
+
+# --- Policy-Enforcement ------------------------------------------------------
+# "default": Policies greifen, sobald ein Pod von mindestens einer Policy
+# selektiert wird (unser Default-Deny-Muster funktioniert damit).
+policyEnforcementMode: default
+
+# --- Observability -----------------------------------------------------------
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+  metrics:
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - port-distribution
+      - icmp
+      - http
+
+operator:
+  replicas: 2

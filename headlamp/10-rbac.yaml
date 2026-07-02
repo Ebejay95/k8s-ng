@@ -1,6 +1,12 @@
-# Headlamp braucht Cluster-Zugriff, um alles zu visualisieren/verwalten.
-# cluster-admin gibt volle Sicht + Verwaltung (Admin-Werkzeug). Wer nur
-# lesen will, bindet stattdessen die eingebaute ClusterRole "view".
+# Headlamp ist ein Beobachtungs-/Visualisierungswerkzeug und laeuft nach dem
+# Least-Privilege-Prinzip READ-ONLY (BSI APP.4.4.A3 - keine unnoetigen
+# cluster-admin-Rechte). Es bindet die eingebaute ClusterRole "view"
+# (namespaced read, ohne Secrets/Write) plus "headlamp-cluster-read" fuer
+# cluster-weite Read-Ressourcen (Nodes, Namespaces, PVs, StorageClasses, CRDs,
+# Metriken), die "view" nicht abdeckt.
+#
+# Wer aus der UI heraus auch AENDERN muss, bindet zusaetzlich "edit" oder
+# "admin" (siehe auskommentierten Block am Ende) - bewusst NICHT cluster-admin.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -9,21 +15,93 @@ metadata:
   labels:
     app: headlamp
 ---
+# Cluster-weite Read-Only-Rolle: alles, was "view" nicht enthaelt.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: headlamp-cluster-read
+  labels:
+    app: headlamp
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - namespaces
+      - persistentvolumes
+      - events
+      - componentstatuses
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+      - volumeattachments
+      - csinodes
+      - csidrivers
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apiregistration.k8s.io"]
+    resources: ["apiservices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["scheduling.k8s.io"]
+    resources: ["priorityclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "clusterrolebindings"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list", "watch"]
+---
+# Namespaced Read (inkl. Pods, Deployments, Services, ConfigMaps ...) via
+# eingebauter ClusterRole "view" - enthaelt bewusst KEINE Secrets.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: headlamp-admin
+  name: headlamp-view
   labels:
     app: headlamp
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-admin
+  name: view
 subjects:
   - kind: ServiceAccount
     name: headlamp
     namespace: headlamp
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: headlamp-cluster-read
+  labels:
+    app: headlamp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: headlamp-cluster-read
+subjects:
+  - kind: ServiceAccount
+    name: headlamp
+    namespace: headlamp
+---
+# --- Optional: Schreibrechte aus der UI (bewusst deaktiviert) ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: headlamp-edit
+#   labels:
+#     app: headlamp
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: edit
+# subjects:
+#   - kind: ServiceAccount
+#     name: headlamp
+#     namespace: headlamp
+# ---
 # Langlebiges Login-Token fuer den Headlamp-ServiceAccount (Bearer-Token beim
 # Login in der UI eingeben). K8s befuellt .data.token automatisch.
 apiVersion: v1

@@ -10,3 +10,4 @@ resources:
   - 20-statefulset.yaml
   - 30-service.yaml
   - 40-create-buckets-job.yaml
+  - 50-networkpolicies.yaml
